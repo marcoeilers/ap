@@ -49,11 +49,8 @@ makeMove pos (player, board) = (nextPlayer, newBoard)
 
 validMove :: Position -> GameState -> Bool
 validMove (x,y) (player, board) = getCell (x,y) board == Empty
-  where -- getCell :: Position -> Board -> Cell
-        getCell (x,y) board = cell
-          where cell    = split y row
-                row     = split x board
-                split i = (curry $ head . snd . (uncurry splitAt)) i
+  where getCell (x,y) board = split y $ split x board
+        split i = (curry $ head . snd . (uncurry splitAt)) i
 
 
 allMoves :: [Position]
