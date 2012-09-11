@@ -50,7 +50,7 @@ makeMove pos (player, board) = (nextPlayer, newBoard)
 validMove :: Position -> GameState -> Bool
 validMove (x,y) (player, board) = getCell (x,y) board == Empty
   where getCell (x,y) board = split y $ split x board
-        split i = (curry $ head . snd . (uncurry splitAt)) i
+        split = curry $ head . snd . (uncurry splitAt)
 
 
 allMoves :: [Position]
@@ -70,8 +70,7 @@ makeTree gs = Node gs [ (pos, subTree pos) | pos <- allValidMoves gs ]
 
 
 -- A much smaller state 
-testMakeTree = makeTree gs
-  where gs = foldr makeMove startState [ (x,y) | x <- [0..2], y <- [0..1] ]
+testMakeTree = makeTree $ foldr makeMove startState [ (x,y) | x <- [0..2], y <- [0..1] ]
 
 -- Return all game states in a game tree, duplicates are allowed
 allNodes :: GameTree -> [GameState]
