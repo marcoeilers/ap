@@ -1,0 +1,86 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{url,paralist}
+\usepackage{amsmath}
+
+\newcommand{\west}{\ensuremath{\textbf{West}}}
+\newcommand{\east}{\ensuremath{\textbf{East}}}
+\newcommand{\south}{\ensuremath{\textbf{South}}}
+\newcommand{\north}{\ensuremath{\textbf{North}}}
+\newcommand{\length}{\ensuremath{\textbf{length}}}
+\newcommand{\el}{\ensuremath{\textbf{ `elem` }}}
+\newcommand{\suc}{\textbf{succ }}
+\newcommand{\prd}{\textbf{pred }}
+
+\title{Advanced Programming\\
+Assignment 1: Navigating the Maze}
+\author{Thomas Bracht Laumann Jespersen\\ \url{ntl316@alumni.ku.dk} \and Marco Eilers\\ \url{dbk726@alumni.ku.dk} }
+
+\begin{document}
+\maketitle
+
+
+\section{Explanation of the code}
+The module World contains all functions and types only concerning the maze, i.e. directions, positions and functions for manipulating them, as well as the testMaze specified in the assignment. 
+
+MEL.hs contains all types and functions concerning the interpreter and test.hs contains several kinds of unit- and integration tests concerning both the maze and the MEL interpreter.
+
+We implemented directions as an Enum in order to simplify the calculation of absolute directions from the robot's current absolute direction and a relative direction. In the function \textbf{fromEnum}, the cardinal directions are assigned to integer values from 0 to 3. The corresponding function \textbf{toEnum} takes an integer and converts it into the corresponding direction. This is done $\mod 4$, so that the function \suc and \prd also succeed when requesting the successor of the last direction or the predecessor of the first one. As a result, appplying \suc to a direction results in a turn to the right and \prd represents a turn to the left. Turning around can be modeled by applying any one of those functions twice.
+
+Our type for the maze is as follows:
+\begin{verbatim}
+data Maze = Maze { width  :: Int
+                 , height :: Int
+                 , cells  :: M.Map Position Cell
+                 } deriving (Show)
+\end{verbatim}
+
+We assume that the maze fulfills the following constraints:  
+
+\begin{itemize}
+  \item \west \el cells ! $(0, \_)$ - It must mot be possible to leave the maze
+  \item \east \el cells ! $(width-1, \_)$ 
+  \item \north \el cells ! $(\_, height-1)$
+  \item \south \el cells ! $(\_, 0)$
+  \item \east \el cells ! $(x, y)$ $\Leftrightarrow$ \west \el cells ! $(x+1, y)$ - One can only go from a to b if of can also go from b to a
+  \item \north \el cells ! $(x, y)$ $\Leftrightarrow$\south \el cells ! $(x+1, y)$
+  \item (Just c) = lookup cells $(x,y)$ - Every cell within the specified boundaries must be defined
+\end{itemize}
+
+For the type RobotCommand, we chose the following format:
+\begin{verbatim}
+newtype RobotCommand a = RC { runRC :: (Maze, Robot) -> Either Robot (a, Robot) }
+\end{verbatim}
+A RobotCommand takes in a World, consisting of a Maze and a Robot. If the command is completed succesfully (the Right case), it returns a pair of (a, Robot); if there is an error during the execution, it returns a Robot, so that the position where the error has occured and the robot's history up until that point can be retrieved. We only return a Robot (instead of a whole World) to reflect the fact that the Maze cannot be changed through command execution.
+
+In order to make this type a monadic instance, we created two functions:
+
+\begin{verbatim}
+inject :: a -> RobotCommand a
+inject a = RC $ \(_,r) -> Right (a,r)
+ 
+chain :: RobotCommand a -> (a -> RobotCommand b) -> RobotCommand b
+chain (RC h) f = RC $ \w@(m,r) -> do (a, r') <- h w
+                                     let (RC g) = f a
+                                     g (m, r')
+                                     
+instance Monad RobotCommand where
+  return = inject
+  (>>=)  = chain
+\end{verbatim}
+The \textbf{chain} function, which we use to define our bind operator, appends one RobotCommand to another one by first running the first command on the input, and then running the second one on the state resulting from the first command. Note that, since the maze does not change and is not returned by the first RC, we run the second RC on a world consisting of our original maze and the robot returned by the first command.
+
+Note that we use \textbf{do}-Syntax in the definition of our monad, which uses the \textbf{Either} monad and does the error handling for us.
+
+The function \textbf{interp}, as specified in the assignment, turns a statement into a RobotCommand. The implementations for moving or changing direction simply manipulate the position and the direction of the input Robot. \textbf{evalCond} evaluates for all conditions if they are true in the given world. 
+
+The implementations for While and Block commands might be of interest: The first evaluates the given condition and, if the condition is satisfied, executes a new block containing the loop body and the while statement itself; otherwise it just returns the current Robot. Similarly, the Block command executes the first statement in the block and then executes a new Block command containing the remaining block statements.
+
+
+
+
+\section{Assessment}
+
+\end{document}
