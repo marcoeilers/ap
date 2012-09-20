@@ -18,6 +18,8 @@ data Stm = Forward
          | Block [Stm]
          deriving (Eq, Show)
 
+type Program = Stm
+
 getRelDir :: Relative -> Direction -> Direction
 getRelDir rel dir = case rel of Ahead   -> dir
                                 ToLeft  -> pred dir
@@ -79,14 +81,20 @@ interp Backward  = RC $ \(maze, robot) -> let d = dir robot
                                           in if validMove maze p np
                                              then Just ((), Robot np d (np : hist robot))
                                              else Nothing
-interp (If cond true false) = RC $ \w@(m,r) -> -- must return Maybe ..if evalCond w cond then interp true else interp false
-  do let (RC a) = if evalCond w cond then interp true else interp false
-     a w
-     
-
-interp (While cond stm)  = undefined
+interp (If cond true false) = RC $ \w@(m,r) -> do let (RC a) = if evalCond w cond
+                                                               then interp true
+                                                               else interp false
+                                                  a w
+interp (While cond stm) = RC $ \w@(m,r) -> do let (RC a) = if evalCond w cond
+                                                           then interp (Block [stm, (While cond stm)])
+                                                           else interp (Block [])
+                                              a w                  
+                                                  
 interp (Block []) = RC $ \(maze, robot) -> Just ((), robot)
-interp (Block (stm:stms)) = undefined
+interp (Block (stm:stms)) = RC $ \w@(m,r) -> do let (RC a) = interp stm
+                                                (_, r') <- a w
+                                                let (RC b) = interp $ Block stms
+                                                b (m,r')
 
 evalCond :: World -> Cond -> Bool
 evalCond w@(m,r) cond = case cond of
@@ -97,6 +105,21 @@ evalCond w@(m,r) cond = case cond of
   AtGoalPos   -> (pos r) == getGoalPos m
 
 
+runProg :: Maze -> Program -> Result ([Position], Direction)
+
+testWorld = initialWorld testMaze
+
+-- Test the ahead function
 testInterpIf = do let (RC f) = interp (If (Wall Ahead) TurnRight TurnLeft)
                   f (initialWorld testMaze)
-                  
+
+testInterpNonEmptyBlock = do let (RC blk) = interp $ Block [TurnRight, Forward, TurnLeft, Forward]
+                             blk testWorld
+
+testWhileTurnLeft = do let (RC whl) = interp $ Block [ While (Wall Ahead) TurnLeft, Forward ]
+                       whl testWorld
+                    
+
+testWhile = do let (RC whl2) = interp $ Block [TurnRight, While (Not (Wall Ahead)) Forward ]
+               whl2 testWorld
+
