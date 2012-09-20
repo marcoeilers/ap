@@ -40,6 +40,7 @@ type World = (Maze, Robot)
 initialWorld :: Maze -> World
 initialWorld maze = (maze, initialRobot)
 
+-- | Begin robotting
 initialRobot :: Robot
 initialRobot = Robot (0,0) North []
 
@@ -86,7 +87,7 @@ interp (While cond stm) = RC $ \w@(m,r) -> do let (RC a) = if evalCond w cond
                                                            then interp (Block [stm, (While cond stm)])
                                                            else interp (Block [])
                                               a w                  
-                                                    
+
 interp (Block []) = RC $ \(maze, robot) -> Right ((), robot)
 interp (Block (stm:stms)) = RC $ \w@(m,r) -> do let (RC a) = interp stm
                                                 (_, r') <- a w
