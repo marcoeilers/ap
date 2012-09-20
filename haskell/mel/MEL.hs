@@ -45,10 +45,10 @@ initialRobot = Robot (0,0) North []
 
 
 -- | The runRC function consumes a world and produces 
-newtype RobotCommand a = RC { runRC :: (Maze, Robot) -> Maybe (a, Robot) }
+newtype RobotCommand a = RC { runRC :: (Maze, Robot) -> Either Robot (a, Robot) }
 
 inject :: a -> RobotCommand a
-inject a = RC $ \(_,r) -> Just (a,r)
+inject a = RC $ \(_,r) -> Right (a,r)
 
 -- | We want to chain two robot commands
 chain :: RobotCommand a -> (a -> RobotCommand b) -> RobotCommand b
@@ -63,21 +63,21 @@ instance Monad RobotCommand where
 
 interp :: Stm -> RobotCommand ()
 interp TurnRight = RC $ \(maze, robot) -> let robot' = Robot (pos robot) (succ (dir robot)) (hist robot)
-                                          in Just ((), robot')
+                                          in Right ((), robot')
 interp TurnLeft  = RC $ \(maze, robot) -> let robot' = Robot (pos robot) (pred (dir robot)) (hist robot)
-                                          in Just ((), robot')
+                                          in Right ((), robot')
 interp Forward   = RC $ \(maze, robot) -> let d = dir robot
                                               p = pos robot
                                               np = neighbor p d
                                           in if validMove maze p np
-                                             then Just ((), Robot np d (p : hist robot))
-                                             else Nothing
+                                             then Right ((), Robot np d (p : hist robot))
+                                             else Left robot
 interp Backward = RC $ \(maze, robot) -> let d = dir robot
                                              p = pos robot
                                              np = neighbor p $ (succ . succ) d
                                          in if validMove maze p np
-                                            then Just ((), Robot np d (p : hist robot))
-                                            else Nothing
+                                            then Right ((), Robot np d (p : hist robot))
+                                            else Left robot
 interp (If cond true false) = RC $ \w@(m,r) -> do let (RC a) = if evalCond w cond
                                                                then interp true
                                                                else interp false
@@ -87,7 +87,7 @@ interp (While cond stm) = RC $ \w@(m,r) -> do let (RC a) = if evalCond w cond
                                                            else interp (Block [])
                                               a w                  
                                                     
-interp (Block []) = RC $ \(maze, robot) -> Just ((), robot)
+interp (Block []) = RC $ \(maze, robot) -> Right ((), robot)
 interp (Block (stm:stms)) = RC $ \w@(m,r) -> do let (RC a) = interp stm
                                                 (_, r') <- a w
                                                 let (RC b) = interp $ Block stms
@@ -102,13 +102,15 @@ evalCond w@(m,r) cond = case cond of
   AtGoalPos   -> (pos r) == getGoalPos m
 
 
--- data Result a = Success a
---               | Failure
+data Result a = Success a | Failure a deriving (Show)
 
---runProg :: Maze -> Program -> Result ([Position], Direction)
-runProg maze program = do let (RC prog) = interp program
-                          (_, r) <- prog $ initialWorld maze
-                          return ((pos r):(hist r), (dir r))
+runProg :: Maze -> Program -> Result ([Position], Direction)
+runProg maze program = let (RC prog) = interp program
+                       in case (prog $ initialWorld maze) of
+                         (Right (_, r)) -> Success $ status r
+                         (Left r)       -> Failure $ status r
+  where status robot = ((pos robot):(hist robot), (dir robot))
+
 
 -- | Testing section
 testWorld = initialWorld testMaze
@@ -137,5 +139,4 @@ wallFollower = runProg testMaze wallFollowProg
                                    (Block [TurnLeft, Forward])
                                )
 
-testNothing = do let (RC f) = interp $ Forward
-                 f testWorld
+testNothing = runProg testMaze Forward
