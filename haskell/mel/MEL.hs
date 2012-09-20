@@ -7,6 +7,7 @@ data Cond = Wall Relative
           | And Cond Cond
           | Not Cond
           | AtGoalPos
+          | Visited Position
           deriving (Eq, Show)
 
 data Stm = Forward
@@ -61,46 +62,56 @@ instance Monad RobotCommand where
   return = inject
   (>>=)  = chain
 
-
 interp :: Stm -> RobotCommand ()
-interp TurnRight = RC $ \(maze, robot) -> let robot' = Robot (pos robot) (succ (dir robot)) (hist robot)
-                                          in Right ((), robot')
-interp TurnLeft  = RC $ \(maze, robot) -> let robot' = Robot (pos robot) (pred (dir robot)) (hist robot)
-                                          in Right ((), robot')
-interp Forward   = RC $ \(maze, robot) -> let d = dir robot
-                                              p = pos robot
-                                              np = neighbor p d
-                                          in if validMove maze p np
-                                             then Right ((), Robot np d (p : hist robot))
-                                             else Left robot
-interp Backward = RC $ \(maze, robot) -> let d = dir robot
-                                             p = pos robot
-                                             np = neighbor p $ (succ . succ) d
-                                         in if validMove maze p np
-                                            then Right ((), Robot np d (p : hist robot))
-                                            else Left robot
-interp (If cond true false) = RC $ \w@(m,r) -> do let (RC a) = if evalCond w cond
-                                                               then interp true
-                                                               else interp false
-                                                  a w
-interp (While cond stm) = RC $ \w@(m,r) -> do let (RC a) = if evalCond w cond
-                                                           then interp (Block [stm, (While cond stm)])
-                                                           else interp (Block [])
-                                              a w                  
+interp stm = RC $ \world@(maze, robot) -> case stm of
+  TurnRight ->
+    let robot' = Robot (pos robot) (succ (dir robot)) (hist robot)
+    in Right ((), robot')
 
-interp (Block []) = RC $ \(maze, robot) -> Right ((), robot)
-interp (Block (stm:stms)) = RC $ \w@(m,r) -> do let (RC a) = interp stm
-                                                (_, r') <- a w
-                                                let (RC b) = interp $ Block stms
-                                                b (m,r')
+  TurnLeft ->
+    let robot' = Robot (pos robot) (pred (dir robot)) (hist robot)
+    in Right ((), robot')
+
+  Forward ->
+    let d = dir robot
+        p = pos robot
+        np = neighbor p d
+    in if validMove maze p np
+       then Right ((), Robot np d (p : hist robot))
+       else Left robot
+  
+  Backward -> 
+    let d = dir robot
+        p = pos robot
+        np = neighbor p $ (succ . succ) d
+    in if validMove maze p np
+       then Right ((), Robot np d (p : hist robot))
+       else Left robot
+  
+  If cond true false -> do
+    let (RC a) = interp $ if evalCond world cond then true else false
+    a world
+
+  While cond stm -> do
+    let (RC a) = interp $ if evalCond world cond
+                          then Block [stm, (While cond stm)]
+                          else Block []
+    a world
+
+  Block []         -> Right ((), robot)
+  Block (stm:stms) -> do
+    let (RC a) = interp stm
+    (_, r') <- a world
+    let (RC b) = interp $ Block stms
+    b (maze,r')
 
 evalCond :: World -> Cond -> Bool
 evalCond w@(m,r) cond = case cond of
-  -- True if from current position there's a wall in the indicated direction (rel)
   (Wall rel)  -> (getRelDir rel (dir r)) `elem` (getCell m (pos r))
   (And c1 c2) -> (evalCond w c1) && (evalCond w c2)
   (Not c)     -> not (evalCond w c)
   AtGoalPos   -> (pos r) == getGoalPos m
+  Visited pos -> pos `elem` (hist r)
 
 
 data Result a = Success a | Failure a deriving (Show)
@@ -130,14 +141,18 @@ testWhile = runProg testMaze whileProg
   where whileProg = Block [ TurnRight
                           , While (Not (Wall Ahead)) Forward
                           ]
+                 
+interpWhile = interp $ Block [ TurnRight, While (Not (Wall Ahead)) Forward ]
+
 
 -- | The wall follower algorithm specified here: http://en.wikipedia.org/wiki/Maze_solving_algorithm
 -- Using the left-hand rule.
 wallFollower = runProg testMaze wallFollowProg
   where wallFollowProg = While (Not AtGoalPos)
-                               (If (Wall ToLeft)
-                                   (If (Wall Ahead) TurnRight Forward)
-                                   (Block [TurnLeft, Forward])
-                               )
+                           (If (Wall ToLeft)
+                             (If (Wall Ahead) TurnRight Forward)
+                             (Block [TurnLeft, Forward]))
+
+
 
 testNothing = runProg testMaze Forward
