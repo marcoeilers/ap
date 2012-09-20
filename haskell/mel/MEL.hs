@@ -47,9 +47,6 @@ initialRobot = Robot (0,0) North []
 -- | The runRC function consumes a world and produces 
 newtype RobotCommand a = RC { runRC :: (Maze, Robot) -> Maybe (a, Robot) }
 
-instance Show (RobotCommand a) where
-  show a = "foo"
-
 inject :: a -> RobotCommand a
 inject a = RC $ \(_,r) -> Just (a,r)
 
@@ -73,14 +70,14 @@ interp Forward   = RC $ \(maze, robot) -> let d = dir robot
                                               p = pos robot
                                               np = neighbor p d
                                           in if validMove maze p np
-                                             then Just ((), Robot np d (np : hist robot))
+                                             then Just ((), Robot np d (p : hist robot))
                                              else Nothing
-interp Backward  = RC $ \(maze, robot) -> let d = dir robot
-                                              p = pos robot
-                                              np = neighbor p $ (succ . succ) d
-                                          in if validMove maze p np
-                                             then Just ((), Robot np d (np : hist robot))
-                                             else Nothing
+interp Backward = RC $ \(maze, robot) -> let d = dir robot
+                                             p = pos robot
+                                             np = neighbor p $ (succ . succ) d
+                                         in if validMove maze p np
+                                            then Just ((), Robot np d (p : hist robot))
+                                            else Nothing
 interp (If cond true false) = RC $ \w@(m,r) -> do let (RC a) = if evalCond w cond
                                                                then interp true
                                                                else interp false
@@ -89,7 +86,7 @@ interp (While cond stm) = RC $ \w@(m,r) -> do let (RC a) = if evalCond w cond
                                                            then interp (Block [stm, (While cond stm)])
                                                            else interp (Block [])
                                               a w                  
-                                                  
+                                                    
 interp (Block []) = RC $ \(maze, robot) -> Just ((), robot)
 interp (Block (stm:stms)) = RC $ \w@(m,r) -> do let (RC a) = interp stm
                                                 (_, r') <- a w
@@ -105,8 +102,14 @@ evalCond w@(m,r) cond = case cond of
   AtGoalPos   -> (pos r) == getGoalPos m
 
 
-runProg :: Maze -> Program -> Result ([Position], Direction)
+-- data Result a = 
 
+runProg :: Maze -> Program -> Maybe ((), Robot)
+runProg maze program = do let (RC prog) = interp program
+                          prog $ initialWorld maze
+
+
+-- | Testing section
 testWorld = initialWorld testMaze
 
 -- Test the ahead function
@@ -118,8 +121,20 @@ testInterpNonEmptyBlock = do let (RC blk) = interp $ Block [TurnRight, Forward, 
 
 testWhileTurnLeft = do let (RC whl) = interp $ Block [ While (Wall Ahead) TurnLeft, Forward ]
                        whl testWorld
-                    
 
-testWhile = do let (RC whl2) = interp $ Block [TurnRight, While (Not (Wall Ahead)) Forward ]
-               whl2 testWorld
+testWhile = runProg testMaze whileProg
+  where whileProg = Block [ TurnRight
+                          , While (Not (Wall Ahead)) Forward
+                          ]
 
+-- | The wall follower algorithm specified here: http://en.wikipedia.org/wiki/Maze_solving_algorithm
+-- Using the left-hand rule.
+wallFollower = runProg testMaze wallFollowProg
+  where wallFollowProg = While (Not AtGoalPos)
+                               (If (Wall ToLeft)
+                                   (If (Wall Ahead) TurnRight Forward)
+                                   (Block [TurnLeft, Forward])
+                               )
+
+testNothing = do let (RC f) = interp $ Forward
+                 f testWorld
