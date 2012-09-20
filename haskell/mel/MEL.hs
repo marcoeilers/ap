@@ -102,12 +102,13 @@ evalCond w@(m,r) cond = case cond of
   AtGoalPos   -> (pos r) == getGoalPos m
 
 
--- data Result a = 
+-- data Result a = Success a
+--               | Failure
 
-runProg :: Maze -> Program -> Maybe ((), Robot)
+--runProg :: Maze -> Program -> Result ([Position], Direction)
 runProg maze program = do let (RC prog) = interp program
-                          prog $ initialWorld maze
-
+                          (_, r) <- prog $ initialWorld maze
+                          return ((pos r):(hist r), (dir r))
 
 -- | Testing section
 testWorld = initialWorld testMaze
