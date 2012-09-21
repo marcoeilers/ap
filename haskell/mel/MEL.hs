@@ -16,6 +16,8 @@ import World
 -- | MEL interpreter data types
 data Relative = Ahead | ToLeft | ToRight | Behind deriving (Eq, Show)
 
+-- | Notes: The condition AtGoalPos is true if the robot is in the 
+-- top right corner of the maze, otherwise it is false
 data Cond = Wall Relative
           | And Cond Cond
           | Not Cond
@@ -40,13 +42,11 @@ getRelDir rel dir = case rel of Ahead   -> dir
                                 ToRight -> succ dir
                                 Behind  -> (succ . succ) dir
 
--- | Notes: The condition AtGoalPos is true if the robot is in the 
--- top right corner of the maze, otherwise it is false
-
 initialWorld :: Maze -> World
 initialWorld maze = (maze, initialRobot)
 
--- | Begin robotting
+-- | A new Robot in the lower left corner looking North
+--   Should always be used when constructing new robots.
 initialRobot :: Robot
 initialRobot = Robot (0,0) North []
 
@@ -55,31 +55,32 @@ initialRobot = Robot (0,0) North []
 newtype RobotCommand a = RC { runRC :: (Maze, Robot) -> Either Robot (a, Robot) }
 
 {- Monadic laws:
-These should be satisfied (actually they must...)
+These must be satisfied 
 
 Left id: return a >>= f === f a
-return a >>= f === ???
 
-Right id: m >>= return = m
-(RC a) >>= return ==> ??? (RC a)?
+Right id: m >>= return === m
 
-Associativity: (m >>= f) >>= g = m >>= (\x -> f x >>= g)
-(RC a) >>= return  ==> ???
+Associativity: (m >>= f) >>= g === m >>= (\x -> f x >>= g)
+
 -}
 
 inject :: a -> RobotCommand a
 inject a = RC $ \(_,r) -> Right (a,r)
 
 -- | We want to chain two robot commands
+-- Using the Either monad inside
 chain :: RobotCommand a -> (a -> RobotCommand b) -> RobotCommand b
 chain (RC h) f = RC $ \w@(m,r) -> do (a, r') <- h w
                                      let (RC g) = f a
                                      g (m, r')
-  
+-- | Our central monad
 instance Monad RobotCommand where
   return = inject
   (>>=)  = chain
 
+-- | Interprets statements into robotCommands.
+-- RobotCommand can then be applied to a world to get a result.
 interp :: Stm -> RobotCommand ()
 interp stm = RC $ \world@(maze, robot) -> case stm of
   TurnRight ->
@@ -121,6 +122,7 @@ interp stm = RC $ \world@(maze, robot) -> case stm of
     let (RC b) = interp $ Block stms
     b (maze,r')
 
+-- | Evaluates all conditions
 evalCond :: World -> Cond -> Bool
 evalCond w@(m,r) cond = case cond of
   (Wall rel)  -> (getRelDir rel (dir r)) `elem` (getCell m (pos r))
@@ -132,6 +134,8 @@ evalCond w@(m,r) cond = case cond of
 
 data Result a = Success a | Failure a deriving (Show, Eq)
 
+-- | runProg should ALWAYS be used to execute a program 
+-- (outside of whitebox testing)
 runProg :: Maze -> Program -> Result ([Position], Direction)
 runProg maze program = let (RC prog) = interp program
                        in case (prog $ initialWorld maze) of

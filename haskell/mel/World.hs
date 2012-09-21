@@ -81,8 +81,10 @@ fromList cells = Maze width height m
         (width,height) = check m
 
 -- | We require that ALL positions in the maze have been specified, 
--- hence we throw an error if this is not the case. Otherwise we 
--- return the height and width of the maze in a tuple.
+-- hence we throw an error if this is not the case. Additionally,
+-- the maze must be completely surrounded by walls, and neighboring
+-- cells must have compatible walls. If all conditions are astisfied, 
+-- we return the height and width of the maze in a tuple.
 check :: M.Map Position Cell -> (Int, Int)
 check cells = if and [ allThere
                      , westCorrect
