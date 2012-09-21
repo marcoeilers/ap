@@ -36,7 +36,7 @@ Assignment 1: Navigating the Maze}
 \section{Explanation of the code}
 The module \src{World} contains all functions and types only concerning the maze, i.e. directions, positions and functions for manipulating them, as well as the testMaze specified in the assignment. 
 
-\src{MEL.hs} contains all types and functions concerning the interpreter and test.hs contains several kinds of unit- and integration tests concerning both the maze and the MEL interpreter.
+\src{MEL.hs} contains all types and functions concerning the interpreter and \src{Test.hs} contains several kinds of unit- and integration tests concerning both the maze and the MEL interpreter.
 
 \subsection{Making sense of cardinal directions in \func{Enum}}
 \func{Enum} was originally indicated to be derived automatically for \func{Direction}, but it wasn't really useful since the standard derivation doesn't facilitate wraparound when using \suc and \prd. Ideally, we would like \suc to be a 90\textdegree\ turn to either left or right, such that for instance for instance, $\text{\suc\ }\west = \north$. In order to this we need to implement the functions \functype{fromEnum}{Direction -> Int} and \functype{toEnum}{Int -> Direction}.
@@ -70,14 +70,15 @@ We assume that the maze fulfills the following constraints:
   \item It must not be possible to leave the maze:
     \begin{itemize}\setlength{\itemsep}{-2pt}
       \item \verb|West `elem` cells| must be \texttt{True} for all positions \makebox{$(0, n)$, $0\leq n < \mathtt{height}$}
-      \item \verb|North `elem` cells| must be \texttt{True} for all positions \makebox{$(n, \mathtt{height})$, $0\leq n < \mathtt{width}$}
-      \item \verb|East `elem` cells| must be \texttt{True} for all positions \makebox{$(\mathtt{width}, n)$, $0\leq n < \mathtt{height}$}
+      \item \verb|North `elem` cells| must be \texttt{True} for all positions \makebox{$(n, \mathtt{height}-1)$, $0\leq n < \mathtt{width}$}
+      \item \verb|East `elem` cells| must be \texttt{True} for all positions \makebox{$(\mathtt{width}-1, n)$, $0\leq n < \mathtt{height}$}
       \item \verb|West `elem` cells| must be \texttt{True} for all positions \makebox{$(n, 0)$, $0\leq n < \mathtt{width}$}
     \end{itemize}
   \item \east \el cells ! $(x, y)$ $\Leftrightarrow$ \west \el cells ! $(x+1, y)$ - One can only go from a to b if of can also go from b to a
   \item \north \el cells ! $(x, y)$ $\Leftrightarrow$\south \el cells ! $(x+1, y)$
   \item (Just c) = lookup cells $(x,y)$ - Every cell within the specified boundaries must be defined
 \end{itemize}
+When creating a new maze through the function \textbf{fromList}, the function \textbf{check} is called to make sure all these constraints are fulfilled; otherwise an error is raised.
 
 For the type RobotCommand, we chose the following format:
 \begin{verbatim}
