@@ -123,6 +123,11 @@ The function \func{interp}, as specified in the assignment, turns a statement in
 
 The implementations for \func{While} and \func{Block} commands might be of interest: The first evaluates the given condition and, if the condition is satisfied, executes a new block containing the loop body and the while statement itself; otherwise it just returns the current Robot. Similarly, the \func{Block} command executes the first statement in the block and then executes a new \func{Block} command containing the remaining block statements.
 
+In order to run a given program, for example \textbf{wallFollowProg}, on a maze (e.g. \textbf{testMaze}), please run
+\begin{lstlisting}[language=haskell]
+  runProg testMaze wallFollowProg
+\end{lstlisting} 
+
 \newpage
 \section{Assessment}
 
@@ -152,7 +157,7 @@ definitely solves this class of loop-less mazes.
 
 Using QuickCheck, we implemented a test (\textbf{testWallfollower}) which puts the robot on a random position in the maze, looking in a random direction. For all starting positions, the algorithm should now terminate successfully in the upper right corner. 
 
-All tests return the expected result (keeping in mind that some tests are \emph{supposed} to result in an error), or at least did so when we ran them (since it is possible that \textbf{testWallfollower} fails from a starting point QuickCheck did not try). We are therefore confident that our implementation agrees with the specification.
+All tests (run \textbf{testAll}) return the expected result (keeping in mind that some tests are \emph{supposed} to result in an error), or at least did so when we ran them (since it is possible that \textbf{testWallfollower} fails from a starting point QuickCheck did not try). We are therefore confident that our implementation agrees with the specification.
 
 We assume that the starting point of the robot is always $(0,0)$ and that the goal is always the North-East corner of the maze. In general, we also expect the user to use \textbf{runProg} on a Maze and a Program whenever he wants to run a program. Other functions are exported solely for testing purposes. 
 

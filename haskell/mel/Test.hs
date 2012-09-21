@@ -25,12 +25,14 @@ instance QC.Arbitrary Direction where
 
 -- | The wall follower algorithm specified here: http://en.wikipedia.org/wiki/Maze_solving_algorithm
 -- Using the left-hand rule.
-wallFollower (LP pos) dir = testProg pos dir wallFollowProg
-  where wallFollowProg = While (Not AtGoalPos)
+wallFollowProg = While (Not AtGoalPos)
                                (If (Wall ToLeft)
                                    (If (Wall Ahead) TurnRight Forward)
                                    (Block [TurnLeft, Forward])
-                               )
+                               )   
+   
+   
+wallFollower (LP pos) dir = testProg pos dir wallFollowProg
                          
 testWallfollower lopos dir = let result = wallFollower lopos dir
                              in case result of
