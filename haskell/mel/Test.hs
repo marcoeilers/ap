@@ -41,8 +41,8 @@ testWallfollower lopos dir = let result = wallFollower lopos dir
 testIf = TestCase $ assertBool "Test simple If command" $ 
          MEL.Success ([(0,0)], East) == (runProg testMaze (If (Wall Ahead) TurnRight TurnLeft))
 
---testEmptyBlock = TestCase $ assertBool "Test if empty block returns unchanged Robot" $
---		 (runProg ())
+testEmptyBlock = TestCase $ assertBool "Test if empty block returns unchanged Robot" $
+		 MEL.Success ([(0,0)], North) == runProg testMaze (Block [])
                   
 
 testNavi = TestCase $ assertBool "Test some simple navigation" $ 
@@ -54,7 +54,7 @@ testWhile = TestCase $ assertBool "Test simple While command" $
 testError = TestCase $ assertBool "Test if crossing walls fails and later commands are ignored" $ 
             MEL.Failure([(0,0)], North) == runProg testMaze (Block[Forward, TurnRight, Forward, Forward])
 
-tests = TestList [testError, testIf, testNavi, testWhile]
+tests = TestList [testError, testIf, testNavi, testWhile, testEmptyBlock]
 
 testAll = do
           runTestTT tests
