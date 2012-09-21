@@ -36,7 +36,7 @@ data Maze = Maze { width  :: Int
                  } deriving (Show)
 
 getGoalPos :: Maze -> Position
-getGoalPos maze = (width maze, height maze)
+getGoalPos maze = (width maze - 1, height maze - 1)
 
 -- | Get the position from a given position and a direction
 -- For instance neighbor (0,1) North #=> (0,2). This function 
@@ -82,7 +82,7 @@ check cells = if and [ allThere
                      , southCorrect
                      , neighborsEW
                      , neighborsNS ]
-              then (w, h)
+              then (w+1, h+1)
               else error "Maze not wellformed"
   where poss         = M.keys cells
         sorted       = L.sort poss
