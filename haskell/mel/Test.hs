@@ -46,10 +46,12 @@ testEmptyBlock = TestCase $ assertBool "Test if empty block returns unchanged Ro
                   
 
 testNavi = TestCase $ assertBool "Test some simple navigation" $ 
-                          MEL.Success ([(1,1),(1,0),(0,0)],North) == (runProg testMaze ( Block [TurnRight, Forward, TurnLeft, Forward]))
+           MEL.Success ([(1,1),(1,0),(1,1),(1,0),(0,0)],North) == 
+           (runProg testMaze ( Block [TurnRight, Forward, TurnLeft, Forward, Backward, Forward]))
+
 
 testWhile = TestCase $ assertBool "Test simple While command" $ 
-                    MEL.Success ([(1,0),(0,0)],East) == runProg testMaze ( Block [ While (Wall Ahead) TurnLeft, Forward])
+            MEL.Success ([(1,0),(0,0)],East) == runProg testMaze ( Block [ While (Wall Ahead) TurnLeft, Forward])
 
 testError = TestCase $ assertBool "Test if crossing walls fails and later commands are ignored" $ 
             MEL.Failure([(0,0)], North) == runProg testMaze (Block[Forward, TurnRight, Forward, Forward])
