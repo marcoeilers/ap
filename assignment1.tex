@@ -2,21 +2,28 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
-\usepackage{url,paralist}
 \usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx,times}
+\usepackage{url,paralist,xspace,textcomp,fullpage}
 
-\newcommand{\west}{\ensuremath{\textbf{West}}}
-\newcommand{\east}{\ensuremath{\textbf{East}}}
-\newcommand{\south}{\ensuremath{\textbf{South}}}
-\newcommand{\north}{\ensuremath{\textbf{North}}}
-\newcommand{\length}{\ensuremath{\textbf{length}}}
-\newcommand{\el}{\ensuremath{\textbf{ `elem` }}}
-\newcommand{\suc}{\textbf{succ }}
-\newcommand{\prd}{\textbf{pred }}
+\newcommand{\west}{\ensuremath{\textbf{West}}\xspace}
+\newcommand{\east}{\ensuremath{\textbf{East}}\xspace}
+\newcommand{\south}{\ensuremath{\textbf{South}}\xspace}
+\newcommand{\north}{\ensuremath{\textbf{North}}\xspace}
+\newcommand{\length}{\ensuremath{\textbf{length}}\xspace}
+\newcommand{\el}{\ensuremath{\textbf{`elem`}}\xspace}
+\newcommand{\suc}{\textbf{\ttfamily succ}\xspace}
+\newcommand{\prd}{\textbf{\ttfamily pred}\xspace}
+
+\newcommand{\src}[1]{\texttt{#1}\xspace}
+\newcommand{\func}[1]{\textbf{\ttfamily #1}\xspace}
+\newcommand{\functype}[2]{\mbox{\texttt{\scriptsize\textbf{#1} ::\ #2}}\xspace}
 
 \title{Advanced Programming\\
 Assignment 1: Navigating the Maze}
 \author{Thomas Bracht Laumann Jespersen\\ \url{ntl316@alumni.ku.dk} \and Marco Eilers\\ \url{dbk726@alumni.ku.dk} }
+
 
 \usepackage{listings}
 \lstset{basicstyle=\ttfamily\scriptsize}
@@ -27,12 +34,27 @@ Assignment 1: Navigating the Maze}
 
 
 \section{Explanation of the code}
-The module World contains all functions and types only concerning the maze, i.e. directions, positions and functions for manipulating them, as well as the testMaze specified in the assignment. 
+The module \src{World} contains all functions and types only concerning the maze, i.e. directions, positions and functions for manipulating them, as well as the testMaze specified in the assignment. 
 
-MEL.hs contains all types and functions concerning the interpreter and test.hs contains several kinds of unit- and integration tests concerning both the maze and the MEL interpreter.
+\src{MEL.hs} contains all types and functions concerning the interpreter and test.hs contains several kinds of unit- and integration tests concerning both the maze and the MEL interpreter.
 
-We implemented directions as an Enum in order to simplify the calculation of absolute directions from the robot's current absolute direction and a relative direction. In the function \textbf{fromEnum}, the cardinal directions are assigned to integer values from 0 to 3. The corresponding function \textbf{toEnum} takes an integer and converts it into the corresponding direction. This is done $\mod 4$, so that the function \suc and \prd also succeed when requesting the successor of the last direction or the predecessor of the first one. As a result, appplying \suc to a direction results in a turn to the right and \prd represents a turn to the left. Turning around can be modeled by applying any one of those functions twice.
+\subsection{Making sense of cardinal directions in \func{Enum}}
+\func{Enum} was originally indicated to be derived automatically for \func{Direction}, but it wasn't really useful since the standard derivation doesn't facilitate wraparound when using \suc and \prd. Ideally, we would like \suc to be a 90\textdegree\ turn to either left or right, such that for instance for instance, $\text{\suc\ }\west = \north$. In order to this we need to implement the functions \functype{fromEnum}{Direction -> Int} and \functype{toEnum}{Int -> Direction}.
 
+\func{toEnum} is straightforward to implement, we just need to arrange the order of the directions, meaning that translating \north to 0, \east should be 1 and so forth. To implement \func{toEnum} it's useful to think of how \func{Enum} works. We have the following equivalence:
+\[
+\text{\suc\ } \west\quad\equiv\quad\text{\func{toEnum} } ((\text{\func{fromEnum} } \west) + 1),
+\]
+meaning that in our case, 4 should be equivalent to \north. It is implemented in the following way:
+\begin{lstlisting}[language=haskell]
+  toEnum n = [North, East, South, West] !! (n `mod` 4)
+\end{lstlisting}
+meaning that for a given direction $d\in\{\north,\east,\south,\west \}$
+\[
+\text{let: } k = \text{\func{fromEnum} } d\quad\text{then}\quad\text{\func{toEnum} } k + 4i = d,\;\forall i\in\mathbb{Z}.
+\]
+
+\subsection{The Maze}
 Our type for the maze is as follows:
 \begin{lstlisting}[language=haskell]
 data Maze = Maze { width  :: Int

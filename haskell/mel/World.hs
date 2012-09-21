@@ -26,7 +26,6 @@ instance Enum Direction where
   fromEnum West  = 3
 
 
-
 type Position = (Int, Int)
 type Cell = [Direction]
 

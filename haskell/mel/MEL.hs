@@ -93,9 +93,7 @@ interp stm = RC $ \world@(maze, robot) -> case stm of
     a world
 
   While cond stm -> do
-    let (RC a) = interp $ if evalCond world cond
-                          then Block [stm, (While cond stm)]
-                          else Block []
+    let (RC a) = interp $ Block $ if evalCond world cond then [stm, (While cond stm)] else []
     a world
 
   Block []         -> Right ((), robot)
