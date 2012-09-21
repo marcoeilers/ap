@@ -54,6 +54,8 @@ testWhile = TestCase $ assertBool "Test simple While command" $
 testError = TestCase $ assertBool "Test if crossing walls fails and later commands are ignored" $ 
             MEL.Failure([(0,0)], North) == runProg testMaze (Block[Forward, TurnRight, Forward, Forward])
 
+testMalformedMaze = TestCase $ assertdo fromList [((4,3), [])]
+
 tests = TestList [testError, testIf, testNavi, testWhile, testEmptyBlock]
 
 testAll = do
