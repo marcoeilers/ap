@@ -63,8 +63,7 @@ data Maze = Maze { width  :: Int
                  } deriving (Show)
 \end{lstlisting}
 
-
-We assume that the maze fulfills the following constraints:  
+We require that the maze fulfills the following constraints:  
 
 \begin{itemize}
   \item It must not be possible to leave the maze:
@@ -74,16 +73,30 @@ We assume that the maze fulfills the following constraints:
       \item \verb|East `elem` cells| must be \texttt{True} for all positions \makebox{$(\mathtt{width}, n)$, $0\leq n < \mathtt{height}$}
       \item \verb|West `elem` cells| must be \texttt{True} for all positions \makebox{$(n, 0)$, $0\leq n < \mathtt{width}$}
     \end{itemize}
-  \item \east \el cells ! $(x, y)$ $\Leftrightarrow$ \west \el cells ! $(x+1, y)$ - One can only go from a to b if of can also go from b to a
-  \item \north \el cells ! $(x, y)$ $\Leftrightarrow$\south \el cells ! $(x+1, y)$
-  \item (Just c) = lookup cells $(x,y)$ - Every cell within the specified boundaries must be defined
+  \item For a given position $(x,y)$ with corresponding cell $c$
+    \begin{itemize}\setlength{\itemsep}{-2pt}
+      \item If $\east \text{\func{`elem`} } c$ then the neighboring cell at $(x+1,y)$ must have a wall \west.
+      \item If $\west \text{\func{`elem`} } c$ then the neighboring cell at $(x-1,y)$ must have a wall \east.
+      \item If $\south \text{\func{`elem`} } c$ then the neighboring cell at $(x,y-1)$ must have a wall \north.
+      \item If $\north \text{\func{`elem`} } c$ then the neighboring cell at $(x,y+1)$ must have a wall \north.
+    \end{itemize}
+  %% \item \east \el cells ! $(x, y)$ $\Leftrightarrow$ \west \el cells ! $(x+1, y)$ - One can only go from a to b if of can also go from b to a
+  %% \item \north \el cells ! $(x, y)$ $\Leftrightarrow$\south \el cells ! $(x+1, y)$
+  \item All cells within the given rectangle from $(0,0)$ to the goal
+    position $(x,y)$ \emph{must} be specified.
+
+    Comment: An interesting modification to this would be to assume that unspecified cells
+    simply have no walls, except for cells on the border. Then a
+    completely empty maze of size \src{width} and \src{height} could
+    be specified as: \src{\scriptsize fromList [((width, height), [])]}
 \end{itemize}
 
+\subsection{\func{RobotCommand}}
 For the type RobotCommand, we chose the following format:
-\begin{verbatim}
+\begin{lstlisting}[language=haskell]
 newtype RobotCommand a = RC { runRC :: (Maze, Robot) -> Either Robot (a, Robot) }
-\end{verbatim}
-A RobotCommand takes in a World, consisting of a Maze and a Robot. If the command is completed succesfully (the Right case), it returns a pair of (a, Robot); if there is an error during the execution, it returns a Robot, so that the position where the error has occured and the robot's history up until that point can be retrieved. We only return a Robot (instead of a whole World) to reflect the fact that the Maze cannot be changed through command execution.
+\end{lstlisting}
+A \func{RobotCommand} takes in a World, consisting of a \func{Maze} and a \func{Robot}. If the command is completed succesfully, it returns \func{Right} $(a, \text{\func{Robot}})$; if there is an error during the execution, it returns \func{Robot}, so that the position where the error has occurred and the robot's history up until that point can be retrieved. We only return a \func{Robot} (instead of a whole World) to reflect the fact that the maze cannot be changed through command execution.
 
 In order to make this type a monadic instance, we created two functions:
 
@@ -100,17 +113,42 @@ instance Monad RobotCommand where
   return = inject
   (>>=)  = chain
 \end{lstlisting}
-The \textbf{chain} function, which we use to define our bind operator, appends one RobotCommand to another one by first running the first command on the input, and then running the second one on the state resulting from the first command. Note that, since the maze does not change and is not returned by the first RC, we run the second RC on a world consisting of our original maze and the robot returned by the first command.
 
-Note that we use \textbf{do}-Syntax in the definition of our monad, which uses the \textbf{Either} monad and does the error handling for us.
+The \func{chain} function, which we use to define our bind operator, appends one RobotCommand to another one by first running the first command on the input, and then running the second one on the state resulting from the first command. Note that, since the maze does not change and is not returned by the first RC, we run the second RC on a world consisting of our original maze and the robot returned by the first command.
 
-The function \textbf{interp}, as specified in the assignment, turns a statement into a RobotCommand. The implementations for moving or changing direction simply manipulate the position and the direction of the input Robot. \textbf{evalCond} evaluates for all conditions if they are true in the given world. 
+Note that we use \func{do}-Syntax in the definition of our monad, which uses the \func{Either} monad and does the error handling for us.
 
-The implementations for While and Block commands might be of interest: The first evaluates the given condition and, if the condition is satisfied, executes a new block containing the loop body and the while statement itself; otherwise it just returns the current Robot. Similarly, the Block command executes the first statement in the block and then executes a new Block command containing the remaining block statements.
+The function \func{interp}, as specified in the assignment, turns a statement into a \func{RobotCommand}. The implementations for moving or changing direction simply manipulate the position and the direction of the input Robot. \func{evalCond} evaluates for all conditions if they are true in the given world. 
 
+The implementations for \func{While} and \func{Block} commands might be of interest: The first evaluates the given condition and, if the condition is satisfied, executes a new block containing the loop body and the while statement itself; otherwise it just returns the current Robot. Similarly, the \func{Block} command executes the first statement in the block and then executes a new \func{Block} command containing the remaining block statements.
 
-
-
+\newpage
 \section{Assessment}
+
+%%Must contain: Assessment of the quality of code, and what the assessment is based on.
+
+To begin with, we're uncertain as to whether or not we've implemented the \func{RobotCommand} correctly as a monad. The first check is whether the \func{inject} and \func{chain} commands obey the monadic laws.
+
+As for testing the functionality of the code, we implemented in the
+robot language, the ``wall following'' algorithm taken from
+Wikipedia\footnote{\url{http://en.wikipedia.org/wiki/Maze_solving_algorithm}},
+where, for a simply connected maze (meaning that all walls are
+connected to the edge) it is possible \emph{``by keeping one hand in
+  contact with one wall of the maze the player is guaranteed not to
+  get lost and will reach a different exit if there is one''}. No maze
+that is simply connected can contain a loop, so this algorithm
+definitely solves this class of loop-less mazes.
+
+
+An interesting extension would be to allow the robot to inspect its
+position. We could extend \func{Cond} in the following way:
+\begin{lstlisting}[language=haskell]
+data Cond = ...
+          | Visited Position
+\end{lstlisting}
+which, when evaluated, inspects the history of the robot and returns
+true if the given position is an element in the history. Using this
+small extension, we could implement a depth-first search algorithm or
+Trémaux' algorithm.
 
 \end{document}

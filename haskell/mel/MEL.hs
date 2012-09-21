@@ -49,6 +49,19 @@ initialRobot = Robot (0,0) North []
 -- | The runRC function consumes a world and produces 
 newtype RobotCommand a = RC { runRC :: (Maze, Robot) -> Either Robot (a, Robot) }
 
+{- Monadic laws:
+These should be satisfied (actually they must...)
+
+Left id: return a >>= f === f a
+return a >>= f === ???
+
+Right id: m >>= return = m
+(RC a) >>= return ==> ??? (RC a)?
+
+Associativity: (m >>= f) >>= g = m >>= (\x -> f x >>= g)
+(RC a) >>= return  ==> ???
+-}
+
 inject :: a -> RobotCommand a
 inject a = RC $ \(_,r) -> Right (a,r)
 
