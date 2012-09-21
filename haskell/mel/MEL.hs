@@ -1,4 +1,15 @@
-module MEL where
+module MEL 
+       ( Relative(..)
+       , Cond(..)
+       , Stm(..)
+       , Program
+       , Result(..)
+       , runProg
+       , RobotCommand(..)
+       , interp
+       , evalCond
+       , initialWorld )
+       where
 
 import World
 
@@ -31,14 +42,6 @@ getRelDir rel dir = case rel of Ahead   -> dir
 
 -- | Notes: The condition AtGoalPos is true if the robot is in the 
 -- top right corner of the maze, otherwise it is false
-
--- | Modelling the state of a robot
-data Robot = Robot { pos  :: Position
-                   , dir  :: Direction
-                   , hist :: [Position]
-                   } deriving (Show, Eq)
-
-type World = (Maze, Robot)
 
 initialWorld :: Maze -> World
 initialWorld maze = (maze, initialRobot)

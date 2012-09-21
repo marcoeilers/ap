@@ -3,6 +3,8 @@ module World
        , Position
        , Cell
        , Maze
+       , Robot(..)
+       , World
        , validMove
        , fromList
        , neighbor
@@ -34,6 +36,13 @@ data Maze = Maze { width  :: Int
                  , height :: Int
                  , cells  :: M.Map Position Cell
                  } deriving (Show)
+                            
+data Robot = Robot { pos  :: Position
+                   , dir  :: Direction
+                   , hist :: [Position]
+                   } deriving (Show, Eq)
+
+type World = (Maze, Robot)
 
 getGoalPos :: Maze -> Position
 getGoalPos maze = (width maze - 1, height maze - 1)

@@ -128,19 +128,41 @@ The implementations for \func{While} and \func{Block} commands might be of inter
 
 %%Must contain: Assessment of the quality of code, and what the assessment is based on.
 
-To begin with, we're uncertain as to whether or not we've implemented the \func{RobotCommand} correctly as a monad. The first check is whether the \func{inject} and \func{chain} commands obey the monadic laws.
+To begin with, we're uncertain as to whether or not we've implemented the \func{RobotCommand} correctly as a monad. While everything seems to work just the way we intended, there are some properties of the monad that we're not sure we understand completely, like the necessity of the first value of \textbf{runRC}'s return pair. In our case, this is simply () at all times. Additionally, we did not succeed in proving that our monad satisfies the monadic laws, although that was mostly due to us not having enough time left. 
 
-As for testing the functionality of the code, we implemented in the
-robot language, the ``wall following'' algorithm taken from
-Wikipedia\footnote{\url{http://en.wikipedia.org/wiki/Maze_solving_algorithm}},
-where, for a simply connected maze (meaning that all walls are
+In general, however, our code does what it is intended to do. We have verified this as far as possible by a number of different unit tests:
+\begin{itemize}
+  \item We have several unit tests making sure that only mazes which satisfy the conditions specified above are accepted. For every condition, we have tests trying to construct one or two mazes which violate the condition, and then perform an operation the result to force evaluation. These tests are \emph{supposed} to result in an error, since \textbf{fromList} throws an error if one or more conditions are not fulfilled. For details, see tests \textbf{testBadMaze1} to \textbf{testBadMaze4}.
+  \item In contrast to that, we test if mazes satisfying the constraints are accepted. There is a unit test called \textbf{testGoodMaze} which creates a very simple maze from correct input data. We expect it to run without errors and return a maze on which we can perform subsequent operations. Additionally, subsequent tests rely on the provided maze being accepted, and would therefore also fail if the maze is falsely rejected.
+  \item There are a number of tests checking if statements are executed as expected. If not specified otherwise, they are all run in the provided \textbf{testMaze}. \textbf{testEmptyBlock} makes sure the execution of an empty block simply returns the world it has received.
+  \item \textbf{testNavi} executes all basic movements like walking forward and backward and turning to both sides, and compares the resulting direction and history to the one we would expect from these statements.
+  \item \textbf{testIf} runs a simple If command. It checks if the condition was evaluated correctly (in this case, Wall Ahead should evaluate to True) and if the If command executes the correct statement. \textbf{testIf2} does the same but with a different condition, which should evaluate to false and therefore execute the other statement.
+  \item \textbf{testWhile} tests a simple while command (going forward until a wall is reached) and makes sure the robot successfully stops at the right position.
+  \item \textbf{testError} tries to execute a statement which would result in the robot jumping over a wall. It makes sure that this statement returns a failure with the correct history, and that subsequent statements (i.e. statements in a block coming after the one which fails) do not change the resulting position, direction or history.
+\end{itemize}
+
+In order to test the functionality of our code as a whole, we implemented the ``wall following'' algorithm taken from
+Wikipedia\footnote{\url{http://en.wikipedia.org/wiki/Maze_solving_algorithm}} for our robot.
+For a simply connected maze (meaning that all walls are
 connected to the edge) it is possible \emph{``by keeping one hand in
   contact with one wall of the maze the player is guaranteed not to
   get lost and will reach a different exit if there is one''}. No maze
 that is simply connected can contain a loop, so this algorithm
-definitely solves this class of loop-less mazes.
+definitely solves this class of loop-less mazes. 
 
+Using QuickCheck, we implemented a test (\textbf{testWallfollower}) which puts the robot on a random position in the maze, looking in a random direction. For all starting positions, the algorithm should now terminate successfully in the upper right corner. 
 
+All tests return the expected result (keeping in mind that some tests are \emph{supposed} to result in an error), or at least did so when we ran them (since it is possible that \textbf{testWallfollower} fails from a starting point QuickCheck did not try). We are therefore confident that our implementation agrees with the specification.
+
+We assume that the starting point of the robot is always $(0,0)$ and that the goal is always the North-East corner of the maze. In general, we also expect the user to use \textbf{runProg} on a Maze and a Program whenever he wants to run a program. Other functions are exported solely for testing purposes. 
+
+If runProg is \emph{not} used, it is possible to create an initial World with a Robot outside the borders of the maze. Running commands on this world will fail as soon as the maze is accessed. We could have prevented this by making World an actual type instead of an alias and not exporting the constructor, but it would have made subsequent pattern matching slightly more difficult.
+
+Apart from that, we check all our assumptions on input data (mainly the maze). It is not possible to build invalid statements, although it is possible to build an endless While loop, which, if interpreted, would result in an infinitely long RobotCommand. However, this is expected behaviour.
+
+We are unaware of any glaring inefficiencies in our choice of data structures and algorithms; as stated above, we are quite happy with our implementation of cardinal and relative directions. We think Haskell's Data.Map type is a reasonable choice for the implementation of the maze structure itself, and otherwise implemented everything as specified. The only point where we are actually unsure if we have done the right thing is, as stated above, the implementation of the monad itself. 
+
+\section{Extensions}
 An interesting extension would be to allow the robot to inspect its
 position. We could extend \func{Cond} in the following way:
 \begin{lstlisting}[language=haskell]
