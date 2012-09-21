@@ -68,30 +68,33 @@ validMove :: Maze -> Position -> Position -> Bool
 validMove maze p q = (getDirection p q) `notElem` ((cells maze) M.! p)
 
 fromList :: [(Position, Cell)] -> Maze
-fromList cells = Maze width height $ M.fromList cells
-  where map = M.fromList cells
-        (width,height) = check map
+fromList cells = Maze width height m
+  where m = M.fromList cells
+        (width,height) = check m
 
 -- | We require that ALL positions in the maze have been specified, 
 -- hence we throw an error if this is not the case. Otherwise we 
 -- return the height and width of the maze in a tuple.
 check :: M.Map Position Cell -> (Int, Int)
-check cells = if allThere && westCorrect && eastCorrect && northCorrect 
-                 && southCorrect && neighborsEW && neighborsNS
-              then (w+1, h+1)
+check cells = if and [ allThere
+                     , westCorrect
+                     , eastCorrect
+                     , northCorrect
+                     , southCorrect
+                     , neighborsEW
+                     , neighborsNS ]
+              then (w, h)
               else error "Maze not wellformed"
-  where poss= M.keys cells
-        sorted = L.sort poss
-        (w,h) = last sorted
-        allThere = sorted == L.sort [ (w',h') | w' <- [0..w], h' <- [0..h] ]
-        westCorrect = checkBorders (Just 0) Nothing West poss cells
-        eastCorrect = checkBorders (Just w) Nothing East poss cells
+  where poss         = M.keys cells
+        sorted       = L.sort poss
+        (w,h)        = last sorted
+        allThere     = sorted == L.sort [ (w',h') | w' <- [0..w], h' <- [0..h] ]
+        westCorrect  = checkBorders (Just 0) Nothing West poss cells
+        eastCorrect  = checkBorders (Just w) Nothing East poss cells
         northCorrect = checkBorders Nothing (Just h) North poss cells
         southCorrect = checkBorders Nothing (Just 0) South poss cells
-        neighborsEW = all (checkNeighbors 1 0 East West cells) 
-                      [(w',h')| w' <-[0..w-1], h' <-[0..h]]
-        neighborsNS = all (checkNeighbors 0 1 North South cells) 
-                      [(w',h')| w' <-[0..w], h' <-[0..h-1]]
+        neighborsEW  = all (checkNeighbors 1 0 East West cells) [ (w',h') | w' <- [0..w-1], h' <- [0..h] ]
+        neighborsNS  = all (checkNeighbors 0 1 North South cells) [ (w',h') | w' <- [0..w], h' <- [0..h-1] ]
         
 checkNeighbors :: Int -> Int -> Direction -> Direction -> M.Map Position Cell -> Position -> Bool
 checkNeighbors dx dy dir1 dir2 cells pos@(x,y) = (dir1 `elem` (cells M.! pos )) 
