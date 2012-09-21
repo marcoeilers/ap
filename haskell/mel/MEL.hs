@@ -1,3 +1,5 @@
+module MEL where
+
 import World
 
 -- | MEL interpreter data types
@@ -112,7 +114,7 @@ evalCond w@(m,r) cond = case cond of
   Visited pos -> pos `elem` (hist r)
 
 
-data Result a = Success a | Failure a deriving (Show)
+data Result a = Success a | Failure a deriving (Show, Eq)
 
 runProg :: Maze -> Program -> Result ([Position], Direction)
 runProg maze program = let (RC prog) = interp program
@@ -121,36 +123,3 @@ runProg maze program = let (RC prog) = interp program
                          (Left r)       -> Failure $ status r
   where status robot = ((pos robot):(hist robot), (dir robot))
 
-
--- | Testing section
-testWorld = initialWorld testMaze
-
--- Test the ahead function
-testInterpIf = do let (RC f) = interp (If (Wall Ahead) TurnRight TurnLeft)
-                  f (initialWorld testMaze)
-
-testInterpNonEmptyBlock = do let (RC blk) = interp $ Block [TurnRight, Forward, TurnLeft, Forward]
-                             blk testWorld
-
-testWhileTurnLeft = do let (RC whl) = interp $ Block [ While (Wall Ahead) TurnLeft, Forward ]
-                       whl testWorld
-
-testWhile = runProg testMaze whileProg
-  where whileProg = Block [ TurnRight
-                          , While (Not (Wall Ahead)) Forward
-                          ]
-                 
-interpWhile = interp $ Block [ TurnRight, While (Not (Wall Ahead)) Forward ]
-
-
--- | The wall follower algorithm specified here: http://en.wikipedia.org/wiki/Maze_solving_algorithm
--- Using the left-hand rule.
-wallFollower = runProg testMaze wallFollowProg
-  where wallFollowProg = While (Not AtGoalPos)
-                           (If (Wall ToLeft)
-                             (If (Wall Ahead) TurnRight Forward)
-                             (Block [TurnLeft, Forward]))
-
-
-
-testNothing = runProg testMaze Forward
