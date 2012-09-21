@@ -156,7 +156,7 @@ All tests return the expected result (keeping in mind that some tests are \emph{
 
 We assume that the starting point of the robot is always $(0,0)$ and that the goal is always the North-East corner of the maze. In general, we also expect the user to use \textbf{runProg} on a Maze and a Program whenever he wants to run a program. Other functions are exported solely for testing purposes. 
 
-If runProg is \emph{not} used, it is possible to create an initial World with a Robot outside the borders of the maze. Running commands on this world will fail as soon as the maze is accessed. We could have prevented this by making World an actual type instead of an alias and not exporting the constructor, but it would have made subsequent pattern matching slightly more difficult.
+If runProg is \emph{not} used, it is possible to create an initial World with a Robot outside the borders of the maze. Running commands on this world will fail as soon as the maze is accessed.
 
 Apart from that, we check all our assumptions on input data (mainly the maze). It is not possible to build invalid statements, although it is possible to build an endless While loop, which, if interpreted, would result in an infinitely long RobotCommand. However, this is expected behaviour.
 
@@ -170,8 +170,16 @@ data Cond = ...
           | Visited Position
 \end{lstlisting}
 which, when evaluated, inspects the history of the robot and returns
-true if the given position is an element in the history. Using this
-small extension, we could implement a depth-first search algorithm or
+true if the given position is an element in the history. A possible implementation would look like this:
+\begin{lstlisting}[language=haskell]
+evalCond w@(m,r) cond = case cond of
+  ...
+  Visited pos -> pos `elem` (hist r)
+\end{lstlisting}
+Using this small extension, we could implement a depth-first search algorithm or
 Trémaux' algorithm.
+
+
+
 
 \end{document}
