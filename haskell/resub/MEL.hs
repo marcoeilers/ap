@@ -116,35 +116,34 @@ interp Forward = do
   if validMove m p np
     then putRobot $ Robot np d (p : hist r)
     else putError r
-         
-interp stm = RC $ \world@(maze, robot) -> case stm of
+interp Backward = do 
+  (m,r) <- getWorld
+  let d = dir r
+      p = pos r
+      np = neighbor p $ (succ . succ) d
+  if validMove m p np
+     then putRobot $ Robot np d (p : hist r)
+     else putError r
+interp (If cond true false) = do
+  w <- getWorld
+  if evalCond w cond 
+    then interp true
+    else interp false
+interp (While cond stm) = do
+  w <- getWorld         
+  if evalCond w cond
+    then interp $ Block [stm, (While cond stm)] 
+    else interp $ Block []
+interp (Block []) = do
+  (_,r) <- getWorld
+  putRobot r
+interp (Block (stm:stms)) = do
+  new <- interp stm
+  interp $ Block stms
 
 {- OLEKS -2: This is a little dirty. Please use do notation instead. Consider
 defining getRobot :: RobotCommand Robot and putRobot :: Robot -> RobotCommand
 (). -}
- 
-  Backward -> 
-    let d = dir robot
-        p = pos robot
-        np = neighbor p $ (succ . succ) d
-    in if validMove maze p np
-       then Right ((), Robot np d (p : hist robot))
-       else Left robot
-  
-  If cond true false -> do
-    let (RC a) = interp $ if evalCond world cond then true else false
-    a world
-
-  While cond stm -> do
-    let (RC a) = interp $ Block $ if evalCond world cond then [stm, (While cond stm)] else []
-    a world
-
-  Block []         -> Right ((), robot)
-  Block (stm:stms) -> do
-    let (RC a) = interp stm
-    (_, r') <- a world
-    let (RC b) = interp $ Block stms
-    b (maze,r')
 
 -- | Evaluates all conditions
 evalCond :: World -> Cond -> Bool
