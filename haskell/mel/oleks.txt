@@ -1,0 +1,20 @@
+I comment directly in your code. All my comments have the following syntax:
+
+{- OLEKS <i>: <t> -}
+
+where <t> is free text and <i> is an integer which indicates the severity of
+the comment, i.e.:
+
+0: stylistict comment.
+-1: pretty bad style.
+-2: problem, most likely with following the assignment text.
+-3: fatal, this is why your program doesn't work.
+
+For resubmission correct (at least) all points below -1. In particular, I will
+ask you to resubmit if I have any points below -1.
+
+Make sure that none of the things I comment occur elsewhere in your code, as
+fixing a reentrant problem in one place does not fix the problem!
+
+It is possible to get positive points which may outweigh the negative ones, but
+in the end it's my own subjective opinion.
