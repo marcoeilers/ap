@@ -10,6 +10,8 @@ module World
        , neighbor
        , getGoalPos
        , getCell
+       , turnRight
+       , turnLeft
        , testMaze
        ) where
 
@@ -18,18 +20,30 @@ import qualified Data.List as L
 
 data Direction = North | South | West | East deriving (Show, Eq, Read)
 
--- | arrange it so succ is the same as going right (from North -> East)
-instance Enum Direction where
-  toEnum n = [North, East, South, West] !! (n `mod` 4)
+turnRight :: Direction -> Direction
+turnRight North = East
+turnRight East  = South
+turnRight South = West
+turnRight West  = North
 
-{- OLEKS -2: This is almost a -3, mod is also defined for negative quotients,
-but !! clearly is not. This is why you should avoid partial functions at all
-costs. -}
+turnLeft :: Direction -> Direction
+turnLeft North  = West
+turnLeft West   = South
+turnLeft South  = East
+turnLeft East   = North
 
-  fromEnum North = 0
-  fromEnum East  = 1
-  fromEnum South = 2
-  fromEnum West  = 3
+-- -- | arrange it so succ is the same as going right (from North -> East)
+-- instance Enum Direction where
+--   toEnum n = [North, East, South, West] !! (n `mod` 4)
+
+-- {- OLEKS -2: This is almost a -3, mod is also defined for negative quotients,
+-- but !! clearly is not. This is why you should avoid partial functions at all
+-- costs. -}
+
+--   fromEnum North = 0
+--   fromEnum East  = 1
+--   fromEnum South = 2
+--   fromEnum West  = 3
 
 
 type Position = (Int, Int)
