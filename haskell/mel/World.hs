@@ -21,7 +21,11 @@ data Direction = North | South | West | East deriving (Show, Eq, Read)
 -- | arrange it so succ is the same as going right (from North -> East)
 instance Enum Direction where
   toEnum n = [North, East, South, West] !! (n `mod` 4)
-  
+
+{- OLEKS -2: This is almost a -3, mod is also defined for negative quotients,
+but !! clearly is not. This is why you should avoid partial functions at all
+costs. -}
+
   fromEnum North = 0
   fromEnum East  = 1
   fromEnum South = 2
@@ -36,7 +40,7 @@ data Maze = Maze { width  :: Int
                  , height :: Int
                  , cells  :: M.Map Position Cell
                  } deriving (Show)
-                            
+
 data Robot = Robot { pos  :: Position
                    , dir  :: Direction
                    , hist :: [Position]
@@ -74,6 +78,8 @@ getNeighbors maze (w,h) = filter withInMaze [(w-1,h), (w+1,h), (w,h-1), (w,h+1)]
 -- | Assuming two cells are neigboring cells
 validMove :: Maze -> Position -> Position -> Bool
 validMove maze p q = (getDirection p q) `notElem` ((cells maze) M.! p)
+
+{- OLEKS -2: M.! is a partial function! Don't use partial functions. -}
 
 fromList :: [(Position, Cell)] -> Maze
 fromList cells = Maze width height m
@@ -117,6 +123,15 @@ checkBorders mx my dir poss cells = xcorrect && ycorrect
         ycorrect = case my of Nothing -> True                      
                               Just yc  -> all (elem dir) [(cells M.! (x,y)) | (x, y) <- poss, yc==y ]
 
+{- OLEKS -1: This whole function is impossible to read. Keep your lines under
+80 characters in width, so use line breaks more gratiously. -}
+
+{- OLEKS -2: Don't throw error. Your runProg should be failing appropriately
+instead if you insist on checking your assumptions (which is a bit redundant
+anyways). -}
+
+{- OLEKS -2: Again, M.! is a partial function, don't use partial functions. -}
+
 -- | Get the direction to go to reach q from p
 getDirection :: Position -> Position -> Direction
 getDirection (pw,ph) (qw,qh) = case (qw-pw,qh-ph) of (0,1)  -> North
@@ -129,6 +144,8 @@ getCell maze pos = (cells maze) M.! pos
 
 testMaze :: Maze
 testMaze = fromList testCells
+
+{- OLEKS 0: This is no place for a test maze. -}
 
 testCells :: [(Position, [Direction])]
 testCells = [ ((0,0),[North,South,West])

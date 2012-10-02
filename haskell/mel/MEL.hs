@@ -1,4 +1,4 @@
-module MEL 
+module MEL
        ( Relative(..)
        , Cond(..)
        , Stm(..)
@@ -54,6 +54,11 @@ initialRobot = Robot (0,0) North []
 -- | The runRC function consumes a world and produces 
 newtype RobotCommand a = RC { runRC :: (Maze, Robot) -> Either Robot (a, Robot) }
 
+{- OLEKS 0: So why don't you just write runRC :: World -> .. ? It's a bit
+nonobvious that if you get a Left Robot, then something went wrong. It would've
+been nice with an error type to go along with the robot, indicating which error
+occured. -}
+
 {- Monadic laws:
 These must be satisfied 
 
@@ -74,53 +79,71 @@ chain :: RobotCommand a -> (a -> RobotCommand b) -> RobotCommand b
 chain (RC h) f = RC $ \w@(m,r) -> do (a, r') <- h w
                                      let (RC g) = f a
                                      g (m, r')
+
+{- OLEKS 0: I don't completely understand why you take return and bind out of
+the instance declaration and call these functions something else? return and
+bind are already bad names since a monad is an applicative functor, but that's
+more of a headache for the Haskell developers. -}
+
 -- | Our central monad
 instance Monad RobotCommand where
   return = inject
   (>>=)  = chain
 
+getWorld :: RobotCommand World
+getWorld = RC $ \world@(maze, robot) -> Right (world, robot)
+
+putRobot :: Robot -> RobotCommand () 
+putRobot robot = RC $ \world@(maze, r) -> Right ((), robot)
+
+putError :: Robot -> RobotCommand ()
+putError robot = RC $ \world@(maze,r) -> Left robot
+
 -- | Interprets statements into robotCommands.
 -- RobotCommand can then be applied to a world to get a result.
 interp :: Stm -> RobotCommand ()
-interp stm = RC $ \world@(maze, robot) -> case stm of
-  TurnRight ->
-    let robot' = Robot (pos robot) (succ (dir robot)) (hist robot)
-    in Right ((), robot')
+interp TurnRight = do 
+  (_,r) <- getWorld
+  putRobot $ Robot (pos r) (succ (dir r)) (hist r)
+interp TurnLeft = do
+  (_,r) <- getWorld 
+  putRobot $ Robot (pos r) (pred (dir r)) (hist r)
+interp Forward = do
+  (m,r) <- getWorld
+  let d = dir r
+      p = pos r
+      np = neighbor p d
+  if validMove m p np
+    then putRobot $ Robot np d (p : hist r)
+    else putError r
+interp Backward = do 
+  (m,r) <- getWorld
+  let d = dir r
+      p = pos r
+      np = neighbor p $ (succ . succ) d
+  if validMove m p np
+     then putRobot $ Robot np d (p : hist r)
+     else putError r
+interp (If cond true false) = do
+  w <- getWorld
+  if evalCond w cond 
+    then interp true
+    else interp false
+interp (While cond stm) = do
+  w <- getWorld         
+  if evalCond w cond
+    then interp $ Block [stm, (While cond stm)] 
+    else interp $ Block []
+interp (Block []) = do
+  (_,r) <- getWorld
+  putRobot r
+interp (Block (stm:stms)) = do
+  interp stm
+  interp $ Block stms
 
-  TurnLeft ->
-    let robot' = Robot (pos robot) (pred (dir robot)) (hist robot)
-    in Right ((), robot')
-
-  Forward ->
-    let d = dir robot
-        p = pos robot
-        np = neighbor p d
-    in if validMove maze p np
-       then Right ((), Robot np d (p : hist robot))
-       else Left robot
-  
-  Backward -> 
-    let d = dir robot
-        p = pos robot
-        np = neighbor p $ (succ . succ) d
-    in if validMove maze p np
-       then Right ((), Robot np d (p : hist robot))
-       else Left robot
-  
-  If cond true false -> do
-    let (RC a) = interp $ if evalCond world cond then true else false
-    a world
-
-  While cond stm -> do
-    let (RC a) = interp $ Block $ if evalCond world cond then [stm, (While cond stm)] else []
-    a world
-
-  Block []         -> Right ((), robot)
-  Block (stm:stms) -> do
-    let (RC a) = interp stm
-    (_, r') <- a world
-    let (RC b) = interp $ Block stms
-    b (maze,r')
+{- OLEKS -2: This is a little dirty. Please use do notation instead. Consider
+defining getRobot :: RobotCommand Robot and putRobot :: Robot -> RobotCommand
+(). -}
 
 -- | Evaluates all conditions
 evalCond :: World -> Cond -> Bool

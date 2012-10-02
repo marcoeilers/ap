@@ -1,7 +1,7 @@
 import qualified Data.Map as Map
 import Data.Char (toUpper)
 import Data.Tuple (swap)
-import Data.List (nub, partition)
+import Data.List (nub, partition,isPrefixOf)
 
 morseTable = Map.fromList [ ('A', ".-")
                           , ('B', "-...")
@@ -37,6 +37,13 @@ encode :: String -> String
 encode msg = concat morseLetters
   where morseLetters = [ s | (Just s) <- translate msg ]
         translate = map (\c -> Map.lookup (toUpper c) morseTable)
+
+-- decode :: String -> [String]
+decode' [] = []
+decode' msg = [ (letter, rest)  | (letter, code) <- Map.assocs morseTable
+                                , code `isPrefixOf` msg
+                                , rest <- drop (length code) msg
+                                ]
 
 -- exploring alternatives, look at the first, see if match 
 decode :: String -> [String]
