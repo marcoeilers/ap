@@ -12,7 +12,6 @@ module World
        , getCell
        , turnRight
        , turnLeft
-       , testMaze
        ) where
 
 import qualified Data.Map as M
@@ -31,20 +30,6 @@ turnLeft North  = West
 turnLeft West   = South
 turnLeft South  = East
 turnLeft East   = North
-
--- -- | arrange it so succ is the same as going right (from North -> East)
--- instance Enum Direction where
---   toEnum n = [North, East, South, West] !! (n `mod` 4)
-
--- {- OLEKS -2: This is almost a -3, mod is also defined for negative quotients,
--- but !! clearly is not. This is why you should avoid partial functions at all
--- costs. -}
-
---   fromEnum North = 0
---   fromEnum East  = 1
---   fromEnum South = 2
---   fromEnum West  = 3
-
 
 type Position = (Int, Int)
 type Cell = [Direction]
@@ -91,22 +76,28 @@ getNeighbors maze (w,h) = filter withInMaze [(w-1,h), (w+1,h), (w,h-1), (w,h+1)]
 
 -- | Assuming two cells are neigboring cells
 validMove :: Maze -> Position -> Position -> Bool
-validMove maze p q = (getDirection p q) `notElem` ((cells maze) M.! p)
-
-{- OLEKS -2: M.! is a partial function! Don't use partial functions. -}
+validMove maze p q = case mcell of (Just cell) -> (getDirection p q) `notElem` cell
+                                   Nothing     -> False
+  where mcell = M.lookup p (cells maze)
 
 fromList :: [(Position, Cell)] -> Maze
 fromList cells = Maze width height m
   where m = M.fromList cells
         (width,height) = check m
 
+check' cells = (w+1, h+1)
+  where (w,h) = last sorted
+        sorted = L.sort $ M.keys cells
+
+{- The following section is sort of ruled out. -}
+        
 -- | We require that ALL positions in the maze have been specified, 
 -- hence we throw an error if this is not the case. Additionally,
 -- the maze must be completely surrounded by walls, and neighboring
 -- cells must have compatible walls. If all conditions are astisfied, 
 -- we return the height and width of the maze in a tuple.
 check :: M.Map Position Cell -> (Int, Int)
-check cells = if and [ allThere
+check cells = if and [allThere
                      , westCorrect
                      , eastCorrect
                      , northCorrect
@@ -125,7 +116,8 @@ check cells = if and [ allThere
         southCorrect = checkBorders Nothing (Just 0) South poss cells
         neighborsEW  = all (checkNeighbors 1 0 East West cells) [ (w',h') | w' <- [0..w-1], h' <- [0..h] ]
         neighborsNS  = all (checkNeighbors 0 1 North South cells) [ (w',h') | w' <- [0..w], h' <- [0..h-1] ]
-        
+
+
 checkNeighbors :: Int -> Int -> Direction -> Direction -> M.Map Position Cell -> Position -> Bool
 checkNeighbors dx dy dir1 dir2 cells pos@(x,y) = (dir1 `elem` (cells M.! pos )) 
                                                 == (dir2 `elem` (cells M.! (x+dx, y+dy)))
@@ -153,38 +145,6 @@ getDirection (pw,ph) (qw,qh) = case (qw-pw,qh-ph) of (0,1)  -> North
                                                      (1,0)  -> East
                                                      (-1,0) -> West
 
-getCell :: Maze -> Position -> Cell
-getCell maze pos = (cells maze) M.! pos
+getCell :: Maze -> Position -> Maybe Cell
+getCell maze pos = M.lookup pos $ cells maze
 
-testMaze :: Maze
-testMaze = fromList testCells
-
-{- OLEKS 0: This is no place for a test maze. -}
-
-testCells :: [(Position, [Direction])]
-testCells = [ ((0,0),[North,South,West])
-            , ((0,1),[North,South,West])
-            , ((0,2),[South,West])
-            , ((0,3),[West,East])
-            , ((0,4),[North,West])
-            , ((1,0),[South])
-            , ((1,1),[North])
-            , ((1,2),[South,East])
-            , ((1,3),[North,West])
-            , ((1,4),[North,South,East])
-            , ((2,0),[North,South])
-            , ((2,1),[South,East])
-            , ((2,2),[West,East])
-            , ((2,3),[])
-            , ((2,4),[North,West,East])
-            , ((3,0),[North,South])
-            , ((3,1),[South,West])
-            , ((3,2),[West])
-            , ((3,3),[])
-            , ((3,4),[North,West,East])
-            , ((4,0),[North,South,East])
-            , ((4,1),[North,South,East])
-            , ((4,2),[North,South,East])
-            , ((4,3),[South,East])
-            , ((4,4),[North,West,East]) 
-            ]

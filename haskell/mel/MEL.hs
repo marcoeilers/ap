@@ -102,9 +102,7 @@ interp Backward = do
      else putError r
 interp (If cond true false) = do
   w <- getWorld
-  interp $ if evalCond w cond 
-           then true
-           else false
+  interp $ if evalCond w cond then true else false
 interp (While cond stm) = do
   w <- getWorld
   if evalCond w cond
@@ -114,20 +112,17 @@ interp (Block [])         = return ()
 interp (Block (stm:stms)) = do interp stm
                                interp $ Block stms
 
-{- OLEKS -2: This is a little dirty. Please use do notation instead. Consider
-defining getRobot :: RobotCommand Robot and putRobot :: Robot -> RobotCommand
-(). -}
-
--- | Evaluates all conditions
+-- | Evaluates conditions
 evalCond :: World -> Cond -> Bool
 evalCond w@(m,r) cond = case cond of
-  (Wall rel)  -> (getRelDir rel (dir r)) `elem` (getCell m (pos r))
+  (Wall rel)  -> case (getCell m (pos r)) of (Just cell) -> (getRelDir rel (dir r)) `elem` cell
+                                             Nothing     -> False
   (And c1 c2) -> (evalCond w c1) && (evalCond w c2)
   (Not c)     -> not (evalCond w c)
   AtGoalPos   -> (pos r) == getGoalPos m
   Visited pos -> pos `elem` (hist r)
 
-
+-- | Idea: Use Result everywhere instead of Either, but would have to make it a Monad
 data Result a = Success a | Failure a deriving (Show, Eq)
 
 -- | runProg should ALWAYS be used to execute a program 
