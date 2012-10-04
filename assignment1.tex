@@ -38,22 +38,6 @@ The module \src{World} contains all functions and types only concerning the maze
 
 \src{MEL.hs} contains all types and functions concerning the interpreter and \src{Test.hs} contains several kinds of unit- and integration tests concerning both the maze and the MEL interpreter.
 
-\subsection{Making sense of cardinal directions in \func{Enum}}
-\func{Enum} was originally indicated to be derived automatically for \func{Direction}, but it wasn't really useful since the standard derivation doesn't facilitate wraparound when using \suc and \prd. Ideally, we would like \suc to be a 90\textdegree\ turn to either left or right, such that for instance for instance, $\text{\suc\ }\west = \north$. In order to this we need to implement the functions \functype{fromEnum}{Direction -> Int} and \functype{toEnum}{Int -> Direction}.
-
-\func{toEnum} is straightforward to implement, we just need to arrange the order of the directions, meaning that translating \north to 0, \east should be 1 and so forth. To implement \func{toEnum} it's useful to think of how \func{Enum} works. We have the following equivalence:
-\[
-\text{\suc\ } \west\quad\equiv\quad\text{\func{toEnum} } ((\text{\func{fromEnum} } \west) + 1),
-\]
-meaning that in our case, 4 should be equivalent to \north. It is implemented in the following way:
-\begin{lstlisting}[language=haskell]
-  toEnum n = [North, East, South, West] !! (n `mod` 4)
-\end{lstlisting}
-meaning that for a given direction $d\in\{\north,\east,\south,\west \}$
-\[
-\text{let: } k = \text{\func{fromEnum} } d\quad\text{then}\quad\text{\func{toEnum} } k + 4i = d,\;\forall i\in\mathbb{Z}.
-\]
-
 \subsection{The Maze}
 Our type for the maze is as follows:
 \begin{lstlisting}[language=haskell]
@@ -90,32 +74,25 @@ We require that the maze fulfills the following constraints:
     completely empty maze of size \src{width} and \src{height} could
     be specified as: \src{\scriptsize fromList [((width, height), [])]}
 \end{itemize}
-When creating a new maze through the function \textbf{fromList}, the function \textbf{check} is called to make sure all these constraints are fulfilled; otherwise an error is raised.
 
 \subsection{\func{RobotCommand}}
 For the type RobotCommand, we chose the following format:
 \begin{lstlisting}[language=haskell]
-newtype RobotCommand a = RC { runRC :: (Maze, Robot) -> Either Robot (a, Robot) }
+newtype RobotCommand a = RC { runRC :: World -> Either Robot (a, Robot) }
 \end{lstlisting}
-A \func{RobotCommand} takes in a World, consisting of a \func{Maze} and a \func{Robot}. If the command is completed succesfully, it returns \func{Right} $(a, \text{\func{Robot}})$; if there is an error during the execution, it returns \func{Robot}, so that the position where the error has occurred and the robot's history up until that point can be retrieved. We only return a \func{Robot} (instead of a whole World) to reflect the fact that the maze cannot be changed through command execution.
+A \func{RobotCommand} takes in a World, consisting of a \func{Maze} and a \func{Robot}. If the command is completed succesfully, it returns \func{Right} $(a, \text{\func{Robot}})$; if there is an error during the execution, it returns \func{Left Robot}, so that the position where the error has occurred and the robot's history up until that point can be retrieved. We only return a \func{Robot} (instead of a whole World) to reflect the fact that the maze cannot be changed through command execution.
 
 In order to make this type a monadic instance, we created two functions:
 
 \begin{lstlisting}[language=haskell]
-inject :: a -> RobotCommand a
-inject a = RC $ \(_,r) -> Right (a,r)
- 
-chain :: RobotCommand a -> (a -> RobotCommand b) -> RobotCommand b
-chain (RC h) f = RC $ \w@(m,r) -> do (a, r') <- h w
+instance Monad RobotCommand where
+  return a     = RC $ \(_,r) -> Right (a, r)
+  (RC h) >>= f = RC $ \w@(m,r) -> do (a, r') <- h w
                                      let (RC g) = f a
                                      g (m, r')
-                                     
-instance Monad RobotCommand where
-  return = inject
-  (>>=)  = chain
 \end{lstlisting}
 
-The \func{chain} function, which we use to define our bind operator, appends one RobotCommand to another one by first running the first command on the input, and then running the second one on the state resulting from the first command. Note that, since the maze does not change and is not returned by the first RC, we run the second RC on a world consisting of our original maze and the robot returned by the first command.
+The bind operator appends one RobotCommand to another one by first running the first command on the input, and then running the second one on the state resulting from the first command. Note that, since the maze does not change and is not returned by the first RC, we run the second RC on a world consisting of our original maze and the robot returned by the first command.
 
 Note that we use \func{do}-Syntax in the definition of our monad, which uses the \func{Either} monad and does the error handling for us.
 
@@ -128,17 +105,12 @@ In order to run a given program, for example \textbf{wallFollowProg}, on a maze 
   runProg testMaze wallFollowProg
 \end{lstlisting} 
 
-\newpage
 \section{Assessment}
 
 %%Must contain: Assessment of the quality of code, and what the assessment is based on.
 
-To begin with, we're uncertain as to whether or not we've implemented the \func{RobotCommand} correctly as a monad. While everything seems to work just the way we intended, there are some properties of the monad that we're not sure we understand completely, like the necessity of the first value of \textbf{runRC}'s return pair. In our case, this is simply () at all times. Additionally, we did not succeed in proving that our monad satisfies the monadic laws, although that was mostly due to us not having enough time left. 
-
-In general, however, our code does what it is intended to do. We have verified this as far as possible by a number of different unit tests (mostly black box):
+In general, our code does what it is intended to do. We have verified this as far as possible by a number of different unit tests (mostly black box):
 \begin{itemize}
-  \item We have several unit tests making sure that only mazes which satisfy the conditions specified above are accepted. For every condition, we have tests trying to construct one or two mazes which violate the condition, and then perform an operation the result to force evaluation. These tests are \emph{supposed} to result in an error, since \textbf{fromList} throws an error if one or more conditions are not fulfilled. For details, see tests \textbf{testBadMaze1} to \textbf{testBadMaze4}.
-  \item In contrast to that, we test if mazes satisfying the constraints are accepted. There is a unit test called \textbf{testGoodMaze} which creates a very simple maze from correct input data. We expect it to run without errors and return a maze on which we can perform subsequent operations. Additionally, subsequent tests rely on the provided maze being accepted, and would therefore also fail if the maze is falsely rejected.
   \item There are a number of tests checking if statements are executed as expected. If not specified otherwise, they are all run in the provided \textbf{testMaze}. \textbf{testEmptyBlock} makes sure the execution of an empty block simply returns the world it has received.
   \item \textbf{testNavi} executes all basic movements like walking forward and backward and turning to both sides, and compares the resulting direction and history to the one we would expect from these statements.
   \item \textbf{testIf} runs a simple If command. It checks if the condition was evaluated correctly (our only white box test) and if the If command executes the correct statement. \textbf{testIf2} does the same but with a different condition, which should evaluate to false and therefore execute the other statement.
@@ -146,24 +118,27 @@ In general, however, our code does what it is intended to do. We have verified t
   \item \textbf{testError} tries to execute a statement which would result in the robot jumping over a wall. It makes sure that this statement returns a failure with the correct history, and that subsequent statements (i.e. statements in a block coming after the one which fails) do not change the resulting position, direction or history.
 \end{itemize}
 
-In order to test the functionality of our code as a whole, we implemented the ``wall following'' algorithm taken from
-Wikipedia\footnote{\url{http://en.wikipedia.org/wiki/Maze_solving_algorithm}} for our robot.
+In order to test the functionality of our code as a whole, we implemented a ``wall following'' algorithm for our robot.
 For a simply connected maze (meaning that all walls are
-connected to the edge) it is possible \emph{``by keeping one hand in
-  contact with one wall of the maze the player is guaranteed not to
-  get lost and will reach a different exit if there is one''}. No maze
+connected to the edge) the robot is guaranteed to reach any cell (including the goal position) without getting lost by following the wall on its left (think of it as ``keeping one hand in contact with the left wall''). No maze
 that is simply connected can contain a loop, so this algorithm
 definitely solves this class of loop-less mazes. 
 
-Using QuickCheck, we implemented a test (\textbf{testWallfollower}) which puts the robot on a random position in the maze, looking in a random direction. For all starting positions, the algorithm should now terminate successfully in the upper right corner. 
+We checked if this algorithms works properly for three different cases:
 
-All tests (run \textbf{testAll}) return the expected result (keeping in mind that some tests are \emph{supposed} to result in an error), or at least did so when we ran them (since it is possible that \textbf{testWallfollower} fails from a starting point QuickCheck did not try). We are therefore confident that our implementation agrees with the specification.
+\begin{itemize}
+  \item For a one-cell maze, there is a test case \textbf{testOneCellMaze} which makes sure the program works correctly in a maze consisting of only one cell (i.e. it terminates immediately, since the robot is already at the goal position).
+  \item Similarly, \textbf{testFourCellMaze} lets the robot find its goal in a simple $2 \times 2$ cells maze and makes sure it ends up at $(1,1)$.
+  \item For the provided test maze, we used QuickCheck to implement a test (\textbf{testWallfollower}) which puts the robot on a random position in the maze, looking in a random direction. For all starting positions, the algorithm should now terminate successfully in the upper right corner. 
+\end{itemize}
+
+All tests (run \textbf{testAll}) return the expected result, or at least did so when we ran them (since it is possible that \textbf{testWallfollower} fails from a starting point QuickCheck did not try). We are therefore confident that our implementation agrees with the specification.
 
 We assume that the starting point of the robot is always $(0,0)$ and that the goal is always the North-East corner of the maze. In general, we also expect the user to use \textbf{runProg} on a Maze and a Program whenever he wants to run a program. Other functions are exported solely for testing purposes. 
 
-If runProg is \emph{not} used, it is possible to create an initial World with a Robot outside the borders of the maze. Running commands on this world will fail as soon as the maze is accessed.
+If runProg is \emph{not} used, it is possible to create an initial World with a Robot outside the borders of the maze. Running commands on this world will fail as soon as the maze is accessed. Since our feedback on the first submission indicated that checking our assumptions for the maze (see above) is unnecessary, we do not do so any more. Running programs on mazes which violate these constraints may therefore result in undefined behaviour.
 
-Apart from that, we check all our assumptions on input data (mainly the maze). It is not possible to build invalid statements, although it is possible to build an endless While loop, which, if interpreted, would result in an infinitely long RobotCommand. However, this is expected behaviour.
+It is not possible to build invalid statements, although it is possible to build an endless While loop, which, if interpreted, would result in an infinitely long RobotCommand. However, this is expected behaviour.
 
 We are unaware of any glaring inefficiencies in our choice of data structures and algorithms; as stated above, we are quite happy with our implementation of cardinal and relative directions. We think Haskell's Data.Map type is a reasonable choice for the implementation of the maze structure itself, and otherwise implemented everything as specified. The only point where we are actually unsure if we have done the right thing is, as stated above, the implementation of the monad itself. 
 
@@ -184,6 +159,8 @@ evalCond w@(m,r) cond = case cond of
 Using this small extension, we could implement a depth-first search algorithm or
 Trémaux' algorithm.
 
+\section{On the resubmission}
+We rewrote the calculation of absolute directions from cardinal directions and relative ones wo work without an enum. We no longer use any partial functions and make more use of the \textbf{RobotCommand} monad, so that our \textbf{interp} function is now entirely written in \textbf{do}-notation. We removed unnecessary checks of maze properties and added some test cases for other maze sizes (most importantly the one-cell maze). 
 
 
 
