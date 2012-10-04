@@ -3,6 +3,7 @@ import MEL
 import Test.HUnit
 import Test.QuickCheck as QC
 
+-- | The test maze from the assignment text.
 testMaze :: Maze
 testMaze = fromList testCells
 
@@ -40,11 +41,11 @@ testWorld pos dir = (testMaze, Robot pos dir [])
 
 -- | Function for starting programs from arbitrary position. Should ONLY be used
 -- for testing purposes, otherwise runProg is the way to go.
-testProg :: Position -> Direction -> Program -> MEL.Result ([Position], Direction)
+testProg :: Position -> Direction -> Program -> MEL.Result ([Position], Direction) String
 testProg p d program = let (RC prog) = interp program
                               in case (prog $ testWorld p d) of
                                  (Right (_, r)) -> MEL.Success $ status r
-                                 (Left r)       -> MEL.Failure $ status r
+                                 (Left  (msg, r)) -> MEL.Failure (status r) msg
   where status robot = ((pos robot):(hist robot), (dir robot))
 
 -- | In order for QuickCheck to generate positions
@@ -69,7 +70,7 @@ wallFollower (LP pos) dir = testProg pos dir wallFollowProg
                          
 testWallfollower lopos dir = let result = wallFollower lopos dir
                              in case result of
-                               MEL.Failure _               -> False
+                               MEL.Failure _ _             -> False
                                MEL.Success (pos:hist, dir) -> pos == (4,4)
 
 ----- Unit Tests
@@ -98,7 +99,7 @@ testWhile = TestCase $ assertBool "Test simple While command" $
 
 -- | Checks if running into a wall results in failure
 testError = TestCase $ assertBool "Test if crossing walls fails and later commands are ignored" $ 
-            MEL.Failure([(0,0)], North) == runProg testMaze (Block[Forward, TurnRight, Forward, Forward])
+            MEL.Failure ([(0,0)], North) "Ran forward into a wall." == runProg testMaze (Block[Forward, TurnRight, Forward, Forward])
 
 -- | Checks if one-cell maze is traversed correctly
 testOneCell = TestCase $ assertBool "Test if robot traverses one-cell maze correctly" $
@@ -110,19 +111,25 @@ testFourCell = TestCase $ assertBool "Test if robot traverses four-cell maze cor
 
 
 -- | All unit tests 
-unitTests = TestList [testEmptyBlock, testNavi, testIf, testIf2, testWhile, testError, testOneCell, testFourCell]
+unitTests = TestList [ testEmptyBlock
+                     , testNavi
+                     , testIf
+                     , testIf2
+                     , testWhile
+                     , testError
+                     , testOneCell
+                     , testFourCell
+                     ]
 
 -- | Run all tests
-testAll = do
-          runTestTT unitTests
-          quickCheck testWallfollower
+testAll = do runTestTT unitTests
+             quickCheck testWallfollower
 
 oneCellMaze :: [(Position, Cell)]
 oneCellMaze = [((0,0), [North, East, West, South])]
 
 fourCellMaze :: [(Position, Cell)]
-fourCellMaze = [((0,0), [South, West, North])
-               ,((0,1), [North, West, South])
-               ,((1,0), [South, East])
-               ,((1,1), [North, East])]
-          
+fourCellMaze = [ ((0,0), [South, West, North])
+               , ((0,1), [North, West, South])
+               , ((1,0), [South, East])
+               , ((1,1), [North, East])]

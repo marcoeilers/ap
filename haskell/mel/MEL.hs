@@ -8,8 +8,8 @@ module MEL
        , RobotCommand(..)
        , interp
        , evalCond
-       , initialWorld )
-       where
+       , initialWorld
+       ) where
 
 import World
 
@@ -55,7 +55,7 @@ initialRobot = Robot (0,0) North []
 --   either Right (a, Robot) if the RC has run successfully,
 --   or Left Robot if there has been an error, with the Robot indicating
 --   the robot's last valid state before the error occured.
-newtype RobotCommand a = RC { runRC :: World -> Either Robot (a, Robot) }
+newtype RobotCommand a = RC { runRC :: World -> Either (String, Robot) (a, Robot) }
 
 -- | Our central monad
 instance Monad RobotCommand where
@@ -70,8 +70,8 @@ getWorld = RC $ \world@(maze, robot) -> Right (world, robot)
 putRobot :: Robot -> RobotCommand () 
 putRobot robot = RC $ \_ -> Right ((), robot)
 
-putError :: Robot -> RobotCommand ()
-putError robot = RC $ \_ -> Left robot
+putError :: Robot -> String -> RobotCommand ()
+putError robot msg = RC $ \_ -> Left (msg, robot)
 
 -- | Interprets statements into robotCommands.
 -- RobotCommand can then be applied to a world to get a result.
@@ -89,7 +89,7 @@ interp Forward = do
       np = neighbor p d
   if validMove m p np
     then putRobot $ Robot np d (p : hist r)
-    else putError r
+    else putError r "Ran forward into a wall."
 interp Backward = do 
   (m,r) <- getWorld
   let d = dir r
@@ -97,7 +97,7 @@ interp Backward = do
       np = neighbor p $ (turnRight . turnRight) d
   if validMove m p np
      then putRobot $ Robot np d (p : hist r)
-     else putError r
+     else putError r "Backed into a wall."
 interp (If cond true false) = do
   w <- getWorld
   interp $ if evalCond w cond then true else false
@@ -113,21 +113,26 @@ interp (Block (stm:stms)) = do interp stm
 -- | Evaluates conditions
 evalCond :: World -> Cond -> Bool
 evalCond w@(m,r) cond = case cond of
-  (Wall rel)  -> case (getCell m (pos r)) of (Just cell) -> (getRelDir rel (dir r)) `elem` cell
-                                             Nothing     -> False
+  (Wall rel)  -> case (getCell m (pos r)) of
+    (Just cell) -> (getRelDir rel (dir r)) `elem` cell 
+    Nothing     -> False
   (And c1 c2) -> (evalCond w c1) && (evalCond w c2)
   (Not c)     -> not (evalCond w c)
   AtGoalPos   -> (pos r) == getGoalPos m
   Visited pos -> pos `elem` (hist r)
 
--- | Idea: Use Result everywhere instead of Either, but would have to make it a Monad
-data Result a = Success a | Failure a deriving (Show, Eq)
+
+-- | Idea: Use Result everywhere instead of Either, but would have to 
+-- make it a Monad 
+data Result a b = Success a
+                | Failure a b deriving (Show, Eq)
 
 -- | runProg should ALWAYS be used to execute a program 
 -- (outside of whitebox testing)
-runProg :: Maze -> Program -> Result ([Position], Direction)
+runProg :: Maze -> Program -> Result ([Position], Direction) String
 runProg maze program = let (RC prog) = interp program
                        in case (prog $ initialWorld maze) of
                          (Right (_, r)) -> Success $ status r
-                         (Left r)       -> Failure $ status r
+                         (Left  (msg, r))  -> Failure (status r) msg
   where status robot = ((pos robot):(hist robot), (dir robot))
+
