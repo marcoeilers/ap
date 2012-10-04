@@ -1,3 +1,5 @@
+/* -*- mode: prolog -*- */
+
 % SEEMS to work for most cases that I've tried. 
 % However, returns a big amount of duplicates
 % and runs infinitely instead of failing if there
