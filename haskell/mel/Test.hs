@@ -100,68 +100,29 @@ testWhile = TestCase $ assertBool "Test simple While command" $
 testError = TestCase $ assertBool "Test if crossing walls fails and later commands are ignored" $ 
             MEL.Failure([(0,0)], North) == runProg testMaze (Block[Forward, TurnRight, Forward, Forward])
 
--- | Checks if correct mazes are accepted
-testGoodMaze = TestCase $ assertBool "Test if well-formed maze is accepted" $
-               let maze = fromList goodMaze 
-               in getGoalPos maze == (1,1)
+-- | Checks if one-cell maze is traversed correctly
+testOneCell = TestCase $ assertBool "Test if robot traverses one-cell maze correctly" $
+              MEL.Success([(0,0)],North) == runProg (fromList oneCellMaze) wallFollowProg
+              
+-- | Checks if simple 2x2 maze is traversed correctly
+testFourCell = TestCase $ assertBool "Test if robot traverses four-cell maze correctly" $
+               MEL.Success([(1,1),(1,0),(0,0)],North) == runProg (fromList fourCellMaze) wallFollowProg
 
--- | All tests we want to succeed
-successTests = TestList [testGoodMaze, testEmptyBlock, testNavi, testIf, testIf2, testWhile, testError]
 
--- | Several kinds of malformed mazes
-testBadMaze1 = TestCase $ assertBool "Test if mazes missing South walls are rejected" $
-               let maze = fromList badMaze1 
-               in getGoalPos maze == (1,1)
-                  
-testBadMaze2 = TestCase $ assertBool "Test if mazes missing East walls are rejected" $
-               let maze = fromList badMaze2
-               in getGoalPos maze == (1,1)
-                  
-testBadMaze3 = TestCase $ assertBool "Test if mazes with inconsistent neighbor walls are rejected" $
-               let maze = fromList badMaze3
-               in getGoalPos maze == (1,1)
-                  
-testBadMaze4 = TestCase $ assertBool "Test if mazes missing cells are rejected" $
-               let maze = fromList badMaze4
-               in getGoalPos maze == (1,1)
-
--- | These tests should fail
-errorTests = TestList [testBadMaze1, testBadMaze2, testBadMaze3, testBadMaze4]
+-- | All unit tests 
+unitTests = TestList [testEmptyBlock, testNavi, testIf, testIf2, testWhile, testError, testOneCell, testFourCell]
 
 -- | Run all tests
 testAll = do
-          print "The following tests should succeed:"
-          runTestTT successTests
+          runTestTT unitTests
           quickCheck testWallfollower
-          print "The following tests should all result in an Error:"
-          runTestTT errorTests
 
-goodMaze :: [(Position, Cell)]
-goodMaze = [((0,0), [West, South])
-           ,((0,1), [West, North])
-           ,((1,0), [East, South])
-           ,((1,1), [East, North])]
+oneCellMaze :: [(Position, Cell)]
+oneCellMaze = [((0,0), [North, East, West, South])]
+
+fourCellMaze :: [(Position, Cell)]
+fourCellMaze = [((0,0), [South, West, North])
+               ,((0,1), [North, West, South])
+               ,((1,0), [South, East])
+               ,((1,1), [North, East])]
           
-badMaze1 :: [(Position, Cell)]
-badMaze1 = [((0,0), [West])
-           ,((0,1), [West, North])
-           ,((1,0), [East, South])
-           ,((1,1), [East, North])]
-           
-badMaze2 :: [(Position, Cell)]
-badMaze2 = [((0,0), [West, South])
-           ,((0,1), [West, North])
-           ,((1,0), [South])
-           ,((1,1), [East, North])]
-           
-badMaze3 :: [(Position, Cell)]
-badMaze3 = [((0,0), [West, East, South])
-           ,((0,1), [West, North])
-           ,((1,0), [East, South])
-           ,((1,1), [East, North])]
-
-badMaze4 :: [(Position, Cell)]
-badMaze4 = [((0,0), [West, South])
-           ,((0,1), [West, North])
-           ,((1,1), [East, North])]
-           

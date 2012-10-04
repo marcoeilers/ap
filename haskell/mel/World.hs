@@ -85,58 +85,11 @@ fromList cells = Maze width height m
   where m = M.fromList cells
         (width,height) = check m
 
-check' cells = (w+1, h+1)
+check :: M.Map Position Cell -> (Int, Int)
+check cells = (w+1, h+1)
   where (w,h) = last sorted
         sorted = L.sort $ M.keys cells
 
-{- The following section is sort of ruled out. -}
-        
--- | We require that ALL positions in the maze have been specified, 
--- hence we throw an error if this is not the case. Additionally,
--- the maze must be completely surrounded by walls, and neighboring
--- cells must have compatible walls. If all conditions are astisfied, 
--- we return the height and width of the maze in a tuple.
-check :: M.Map Position Cell -> (Int, Int)
-check cells = if and [allThere
-                     , westCorrect
-                     , eastCorrect
-                     , northCorrect
-                     , southCorrect
-                     , neighborsEW
-                     , neighborsNS ]
-              then (w+1, h+1)
-              else error "Maze not wellformed"
-  where poss         = M.keys cells
-        sorted       = L.sort poss
-        (w,h)        = last sorted
-        allThere     = sorted == L.sort [ (w',h') | w' <- [0..w], h' <- [0..h] ]
-        westCorrect  = checkBorders (Just 0) Nothing West poss cells
-        eastCorrect  = checkBorders (Just w) Nothing East poss cells
-        northCorrect = checkBorders Nothing (Just h) North poss cells
-        southCorrect = checkBorders Nothing (Just 0) South poss cells
-        neighborsEW  = all (checkNeighbors 1 0 East West cells) [ (w',h') | w' <- [0..w-1], h' <- [0..h] ]
-        neighborsNS  = all (checkNeighbors 0 1 North South cells) [ (w',h') | w' <- [0..w], h' <- [0..h-1] ]
-
-
-checkNeighbors :: Int -> Int -> Direction -> Direction -> M.Map Position Cell -> Position -> Bool
-checkNeighbors dx dy dir1 dir2 cells pos@(x,y) = (dir1 `elem` (cells M.! pos )) 
-                                                == (dir2 `elem` (cells M.! (x+dx, y+dy)))
-        
-checkBorders :: Maybe Int -> Maybe Int -> Direction -> [Position] -> M.Map Position Cell -> Bool
-checkBorders mx my dir poss cells = xcorrect && ycorrect  
-  where xcorrect = case mx of Nothing -> True
-                              Just xc  ->  all (elem dir) [(cells M.! (x,y)) | (x, y) <- poss, xc==x ]
-        ycorrect = case my of Nothing -> True                      
-                              Just yc  -> all (elem dir) [(cells M.! (x,y)) | (x, y) <- poss, yc==y ]
-
-{- OLEKS -1: This whole function is impossible to read. Keep your lines under
-80 characters in width, so use line breaks more gratiously. -}
-
-{- OLEKS -2: Don't throw error. Your runProg should be failing appropriately
-instead if you insist on checking your assumptions (which is a bit redundant
-anyways). -}
-
-{- OLEKS -2: Again, M.! is a partial function, don't use partial functions. -}
 
 -- | Get the direction to go to reach q from p
 getDirection :: Position -> Position -> Direction

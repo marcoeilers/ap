@@ -52,12 +52,10 @@ initialRobot = Robot (0,0) North []
 
 
 -- | The runRC function consumes a world and produces 
+--   either Right (a, Robot) if the RC has run successfully,
+--   or Left Robot if there has been an error, with the Robot indicating
+--   the robot's last valid state before the error occured.
 newtype RobotCommand a = RC { runRC :: World -> Either Robot (a, Robot) }
-
-{- OLEKS 0: So why don't you just write runRC :: World -> .. ? It's a bit
-nonobvious that if you get a Left Robot, then something went wrong. It would've
-been nice with an error type to go along with the robot, indicating which error
-occured. -}
 
 -- | Our central monad
 instance Monad RobotCommand where
