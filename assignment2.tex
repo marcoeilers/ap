@@ -1,0 +1,61 @@
+\documentclass[a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{url,paralist,xspace,textcomp}
+
+%% First argument is name of Prolog function, second argument is number of args
+\newcommand{\pfunc}[1]{\textnormal{\texttt{#1}}\xspace}
+\newcommand{\pfuncn}[2]{\textnormal{\texttt{#1/#2}}\xspace}
+
+\title{Advanced Programming\\ Assignment 2: Number sets in Prolog}
+\author{Thomas Bracht Laumann Jespersen\\ \url{ntl316@alumni.ku.dk} \and Marco Eilers\\ \url{dbk726@alumni.ku.dk} }
+
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\scriptsize}
+
+
+\begin{document}
+\maketitle
+
+\begin{description}
+\item[\pfuncn{less}{2}] This one is simple.
+\begin{lstlisting}[language=prolog]
+less(z,s(_)).
+less(s(X), s(Y)) :- less(X,Y).
+\end{lstlisting}
+If the first argument is \texttt{z}, and the other some \texttt{s} constructor containing whatever, then we succeed, because \texttt{z} is less than any other natural number.
+
+On the other hand, if we have two functors \texttt{s(X)}, and \texttt{s(Y)}, we strip those off and consider the recursive application of \texttt{less(X, Y)}.
+\item[\pfuncn{checkset}{1}] This one is rather simple, using \pfuncn{less}{2}.
+\item[\pfuncn{ismember}{3}] As is specified in the assignment text, whenever $t_1$ does not represent a number, or $t_2$ does not represent a set, the behaviour is unconstrained %%, meaning we can do basically whatever we please.
+  This means in particular that we don't have to explicitly check whether $t_1$ or $t_2$ are `wellformed'.
+
+  One \emph{could} use the predicate \pfunc{checkset} in the definition of \pfunc{ismember}, but doing so results in a lot of duplicate instances, so we haven't used it for that reason. This means however that \pfunc{checkset} will find solutions in improper sets (un-ordered, or otherwise). TODO: Rephrase.
+
+  We consider the query, and its output in Prolog:
+\begin{lstlisting}[language=prolog]
+?- ismember(N, [s(z), s(s(s(z)))], A).
+N = s(z),
+A = yes ;
+N = z,
+A = no ;
+N = s(s(s(z))),
+A = yes ;
+N = s(s(z)),
+A = no ;
+N = s(s(s(s(_G35)))),
+A = no ;
+false.
+\end{lstlisting}
+\item[\pfuncn{union}{3}]\hfill
+  \begin{quotation}\itshape
+    Write a predicate \pfuncn{union}{3}, such that, if $t_1$, $t_2$ and $t_3$ represent $s_1$, $s_2$ and $s_3$ respectively, $\pfunc{union}(t_1, t_2, t_3)$ succeeds iff $s_3 = s_1 \cup s_2$.
+  \end{quotation}
+\item[\pfuncn{intersection}{3}]. Same as above, but the query $\pfunc{intersection}(t_1,t_2,t_3)$ succeeds iff $s_3 = s_1 \cap s_2$.
+\end{description}
+
+\end{document}
