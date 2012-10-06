@@ -16,22 +16,20 @@ checkset([A,B|C]) :-
 	checkset([B|C]).
 
 
-ismember(X,Y,no):-
-	checkset([X|Y]),
-	checkset(Y).
-ismember(X,Y,no):-
-	checkset([Y|X]),
-	checkset(Y).
-ismember(X,[H|T],no):-
-	checkset([H,X|T]),
-	ismember(X,T,no),
-	checkset([H|T]).
-
 ismember(X,[X|Z],yes) :- 
 	checkset([X|Z]).
 ismember(X,[Y|Z],yes) :- 
 	checkset([Y|Z]), 
 	ismember(X,Z,yes).
+
+ismember(X,[],no):- num(X).
+ismember(X,[Y|T],no):-
+	checkset([X,Y|T]),
+	checkset([Y|T]).
+ismember(X,[H|T],no):-
+	less(H,X),
+	ismember(X,T,no),
+	checkset([H|T]).
 
 union([],[],[]).
 union([H|R],Y,[H|T]) :- 
