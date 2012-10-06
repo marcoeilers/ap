@@ -1,6 +1,6 @@
 /* -*- mode: prolog -*- */
 
-% Some problems with duplicates for union and intersection left.
+% It seems to me that everything works now.
 
 less(z,s(X)):- num(X).
 less(s(X), s(Y)) :- less(X,Y).
@@ -33,20 +33,15 @@ ismember(X,[Y|Z],yes) :-
 	checkset([Y|Z]), 
 	ismember(X,Z,yes).
 
-% union([s(z)],Y,[z,s(z)]).
-% has duplicate of Y=[z,s(z)]
-union(X,[],X):- checkset(X).
-union([],X,X):- checkset(X).
-union([H|R],[A|B],[H|T]) :- 
-	union(R,[A|B],T),
-	less(H,A),
-	checkset([A|B]), 
+union([],[],[]).
+union([H|R],Y,[H|T]) :- 
+	union(R,Y,T),
+	checkset(Y), 
 	checkset([H|T]),
 	checkset([H|R]).
-union([A|B],[H|R],[H|T]) :- 
-	union([A|B],R,T),
-	less(H,A),
-	checkset([A|B]), 
+union(X,[H|R],[H|T]) :- 
+	union(X,R,T),
+	checkset(X), 
 	checkset([H|T]),
 	checkset([H|R]).
 union([H|B],[H|R],[H|T]) :- 
@@ -55,7 +50,6 @@ union([H|B],[H|R],[H|T]) :-
 	checkset([H|T]),
 	checkset([H|R]).
 
-%some duplicates
 intersection([H|B], [H|D], [H|F]):-
 	intersection(B,D,F),
 	checkset([H|B]),
@@ -73,8 +67,9 @@ intersection([A|B], [C|D], I):-
 	checkset([A|B]),
 	checkset([C|D]),
 	checkset(I).
-intersection(_,[],[]).
-intersection([],_,[]).
+intersection([_|_],[],[]).
+intersection([],[_|_],[]).
+intersection([],[],[]).
 	
 
 
