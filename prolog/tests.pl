@@ -73,7 +73,8 @@ test(unionFirstX, [all(X==[[z], [z, s(z)]])]) :-
 test(unionFail, [fail]) :-
 	union(_, [s(z)], [z, s(s(z))]).
 
-% We cannot really test for both of the first values being unbound, but it works.
+test(unionXY, [all([X,Y]==[[ [z], []], [[], [z]], [[z], [z]]])]) :-
+	union(X, Y, [z]).
 
 test(intersectionEmpty) :-
 	intersection([], [], []).
