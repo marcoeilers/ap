@@ -20,6 +20,10 @@
 
 \begin{document}
 \maketitle
+\section*{Code description}
+The code comes in two files: \texttt{numbersets.pl} contains the actual code, i.e. the predicates we were supposed to implement; \texttt{tests.pl} contains unit tests for said predicates, implemented with \texttt{plunit}.
+
+We implemented the following predicates:
 
 \begin{description}
 \item[\pfuncn{num}{1}] We use the predicate \texttt{num} to determine if a given term is a valid number in our representation. This is the case if the term is either zero or the successor of another number, and therefore
@@ -122,5 +126,9 @@ intersection([],[_|_],[]).
 intersection([],[],[]).
 \end{lstlisting}
 \end{description}
+
+\section*{Assessment}
+
+
 
 \end{document}
