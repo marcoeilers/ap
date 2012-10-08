@@ -5,6 +5,8 @@
 less(z,s(X)):- num(X).
 less(s(X), s(Y)) :- less(X,Y).
 
+different(X,Y) :- less(X,Y).
+different(X,Y) :- less(Y,X).
 
 num(z).
 num(s(X)) :- num(X).
@@ -15,30 +17,16 @@ checkset([A,B|C]) :-
 	less(A,B), 
 	checkset([B|C]).
 
-ismember(X,[X|Z],yes) :- 
-	checkset([X|Z]).
-ismember(X,[Y|Z],yes) :- 
-	checkset([Y|Z]), 
-	ismember(X,Z,yes).
-
-ismember(X,[],no):- num(X).
-ismember(X,[Y|T],no):-
-	checkset([X,Y|T]),
-	checkset([Y|T]).
-ismember(X,[H|T],no):-
-	less(H,X),
-	ismember(X,T,no),
-	checkset([H|T]).
-
 % If t1 is not a number/t2 not a set the behaviour is not constrained
 % - the behaviour of equal and different take care of constraining our
 % matches to proper num(...).
-ismember_simple(_, [], no).
-ismember_simple(X, [Y|_], yes) :-
-	equal(X,Y).
-ismember_simple(X, [Y|Z], P) :-
+ismember(_, [], no).
+ismember(X, [X|Y], yes) :-
+	checkset([X|Y]).
+ismember(X, [Y|Z], P) :-
 	different(X,Y),
-	ismember(X, Z, P).
+	ismember(X, Z, P),
+	checkset([Y|Z]).
 
 union([],[],[]).
 union([H|R],Y,[H|T]) :- 
