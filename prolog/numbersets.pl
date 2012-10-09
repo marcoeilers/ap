@@ -1,7 +1,5 @@
 /* -*- mode: prolog -*- */
 
-% It seems to me that everything works now.
-
 less(z,s(X)):- num(X).
 less(s(X), s(Y)) :- less(X,Y).
 
@@ -17,9 +15,6 @@ checkset([A,B|C]) :-
 	less(A,B), 
 	checkset([B|C]).
 
-% If t1 is not a number/t2 not a set the behaviour is not constrained
-% - the behaviour of equal and different take care of constraining our
-% matches to proper num(...).
 ismember(_, [], no).
 ismember(X, [X|Z], yes) :-
 	checkset([X|Z]).
@@ -27,7 +22,6 @@ ismember(X, [Y|Z], P) :-
 	ismember(X, Z, P),
 	checkset([Y|Z]),
 	different(X,Y).
-
 
 union([],[],[]).
 union([H|R],Y,[H|T]) :- 
@@ -46,6 +40,9 @@ union([H|B],[H|R],[H|T]) :-
 	checkset([H|T]),
 	checkset([H|R]).
 
+intersection([_|_],[],[]).
+intersection([],[_|_],[]).
+intersection([],[],[]).
 intersection([H|B], [H|D], [H|F]):-
 	intersection(B,D,F),
 	checkset([H|B]),
@@ -63,6 +60,4 @@ intersection([A|B], [C|D], I):-
 	checkset([A|B]),
 	checkset([C|D]),
 	checkset(I).
-intersection([_|_],[],[]).
-intersection([],[_|_],[]).
-intersection([],[],[]).
+
