@@ -39,6 +39,11 @@ less(s(X), s(Y)) :- less(X,Y).
 If the first argument is \texttt{z}, and the other some \texttt{s} constructor containing any other number, then we succeed, because \texttt{z} is less than any other natural number.
 
 On the other hand, if we have two functors \texttt{s(X)}, and \texttt{s(Y)}, we strip those off and consider the recursive application of \texttt{less(X, Y)}.
+\item[\pfuncn{different}{2}] We implemented this helper predicate for use in later predicates. Two numbers are considered different if either the first is less than the second or the second is less than the first:
+\begin{lstlisting}[language=prolog]
+different(X,Y) :- less(X,Y).
+different(X,Y) :- less(Y,X).
+\end{lstlisting}
 \item[\pfuncn{checkset}{1}] This one is rather simple, using \pfuncn{less}{2}.
 
 A list is a valid set if it is either empty, it contains only one number, or it contains several numbers, where each number is bigger than the one before.  We therefore get the predicate 
@@ -128,7 +133,11 @@ intersection([],[],[]).
 \end{description}
 
 \section*{Assessment}
+We think that our code satisfies the specification and in general does what is intended to do. We tested all (modes of all) predicates with finite output using \texttt{plunit} (see file \texttt{tests.pl} information on the specific tests) and manually checked the cases with infinite output, since \texttt{plunit} cannot handle those. 
 
+We managed to avoid duplicates for all required cases, and as far as we know we always explicitly fail instead of going into infinite loops. Whereever possible, we explicitly made sure that invalid input is not accepted (using $\pfuncn{checkset}{1}$ and $\pfuncn{num}{1}$) in order to ensure that, if a variable is left unbound, our output will be valid. 
+
+We overfulfilled the requirements in several places, making sure that our predicates also work in modes not required by the assignment text; for example, our $\pfuncn{intersection}{3}$ predicate also works correctly if either $t_1$ or $t_2$ (but not both) are unbound.
 
 
 \end{document}
