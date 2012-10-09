@@ -74,11 +74,9 @@ N = s(s(s(s(_G35)))),
 A = no ;
 false.
 \end{lstlisting}
-\item[\pfuncn{union}{3}]\hfill
-  \begin{quotation}\itshape
-    Write a predicate \pfuncn{union}{3}, such that, if $t_1$, $t_2$ and $t_3$ represent $s_1$, $s_2$ and $s_3$ respectively, $\pfunc{union}(t_1, t_2, t_3)$ succeeds iff $s_3 = s_1 \cup s_2$.
-  \end{quotation}
-  Here we make use of the fact that a valid set representation contains all elements in ascending order (and, as usual, make sure that our inputs are in fact valid sets by using $\pfuncn{checkset}{1}$). This means that the first (and therefore smallest) element of $t_3$ must necessarily also be the first element of either $t_1$, $t_2$ or both. Consider the case where $t_1$ and $t_3$ have the same first element. We can remove those first elements from the lists, and the resulting lists $t_1'$ and $t_3'$ must again be representations of sets so that $s_3' = s_1' \cup s_2$. The case where the first elements of $t_2$ and $t_3$ are equal is analogous. If all three lists start with the same element, we remove the element from all three lists and apply $\pfuncn{union}{3}$ on the remaining lists. Finally, the union of two empty sets is again an empty set. 
+\item[\pfuncn{union}{3}] Here we make use of the fact that a valid set representation contains all elements in ascending order (and, as usual, make sure that our inputs are in fact valid sets by using $\pfuncn{checkset}{1}$). This means that the first (and therefore smallest) element of $t_3$ must necessarily also be the first element of either $t_1$, $t_2$ or both. 
+
+Consider the case where only $t_1$ and $t_3$ have the same first element. We can remove those first elements from the lists, and the resulting lists $t_1'$ and $t_3'$ must again be representations of sets so that $s_3' = s_1' \cup s_2$. The case where the first elements of $t_2$ and $t_3$ are equal is analogous. If all three lists start with the same element, we remove the element from all three lists and apply $\pfuncn{union}{3}$ on the remaining lists. Finally, the union of two empty sets is again an empty set. 
   
   The resulting predicate looks like this:
   \begin{lstlisting}[language=prolog]
@@ -101,9 +99,7 @@ union([H|B],[H|R],[H|T]) :-
 \end{lstlisting}
 
 Note that with this predicate, all of the three latter rules will be matched if the first element is the same in all lists. However, evaluation of the former two will fail in the next step, so this is not a problem.
-\item[\pfuncn{intersection}{3}]. Same as above, but the query $\pfunc{intersection}(t_1,t_2,t_3)$ succeeds iff $s_3 = s_1 \cap s_2$.
-
-The implementation is similar to that of \texttt{union}. We have two cases here: Either all three lists start with the same element, or they do not. In the former case, like in the $\pfuncn{union}{3}$ predicate, the remaining lists without the first element have to satisfy the $\pfuncn{intersection}{3}$ predicate as well, so we just use it recursively. In the case where the first elements of $t_1$ and $t_2$ are different, we use $\pfuncn{less}{2}$ to determine the smaller one, and make sure that all lists without this element also satisfy $\pfuncn{intersection}{3}$. For example, if we find that $t_1$ starts with the smallest number and $t_1'$ is $t_1$ without this number, we must have that $s_3 = s_1' \cap s_2$. 
+\item[\pfuncn{intersection}{3}] The implementation is similar to that of \texttt{union}. We have two cases here: Either all three lists start with the same element, or at least one of them starts with a different one. In the former case, like in the $\pfuncn{union}{3}$ predicate, the remaining lists without the first element have to satisfy the $\pfuncn{intersection}{3}$ predicate as well, so we just use it recursively. In the case where the first elements of $t_1$ and $t_2$ are different, we use $\pfuncn{less}{2}$ to determine the smaller one, and make sure that after removing this element, all lists still satisfy $\pfuncn{intersection}{3}$. For example, if we find that $t_1$ starts with the smallest number and $t_1'$ is $t_1$ without this number, we must have that $s_3 = s_1' \cap s_2$. 
 
 Again, we have special rules for empty sets: The intersection of any set with an empty set is the empty set, and so is of course the intersection of two empty sets. We need three distinct rules for this in order to cover all cases without getting duplicate results. 
 
