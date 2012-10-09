@@ -21,12 +21,13 @@ checkset([A,B|C]) :-
 % - the behaviour of equal and different take care of constraining our
 % matches to proper num(...).
 ismember(_, [], no).
-ismember(X, [X|Y], yes) :-
-	checkset([X|Y]).
+ismember(X, [X|Z], yes) :-
+	checkset([X|Z]).
 ismember(X, [Y|Z], P) :-
-	different(X,Y),
 	ismember(X, Z, P),
-	checkset([Y|Z]).
+	checkset([Y|Z]),
+	different(X,Y).
+
 
 union([],[],[]).
 union([H|R],Y,[H|T]) :- 
