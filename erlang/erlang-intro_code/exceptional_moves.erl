@@ -4,7 +4,7 @@
 %% Author: Ken Friis Larsen <kflarsen@diku.dk>
 
 -module(exceptional_moves).
--export([move/2,ignore_invalid/2]).
+-export([move/2,ignore_invalid/2,ignore_invalidW/2]).
 
 move(north, {X, Y}) -> {X, Y+1};
 move(west, {0, _}) -> throw(invalid_move);
