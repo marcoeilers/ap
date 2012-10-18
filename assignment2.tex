@@ -6,10 +6,15 @@
 \usepackage{amsfonts}
 \usepackage{graphicx}
 \usepackage{url,paralist,xspace,textcomp}
+\usepackage{enumitem}
+\usepackage{fullpage}
 
 %% First argument is name of Prolog function, second argument is number of args
 \newcommand{\pfunc}[1]{\textnormal{\texttt{#1}}\xspace}
 \newcommand{\pfuncn}[2]{\textnormal{\texttt{#1/#2}}\xspace}
+
+\newcommand{\plVar}[1]{\texttt{#1}\xspace}
+\newcommand{\code}[1]{\texttt{\scriptsize #1}}
 
 \title{Advanced Programming\\ Assignment 2: Number sets in Prolog}
 \author{Thomas Bracht Laumann Jespersen\\ \url{ntl316@alumni.ku.dk} \and Marco Eilers\\ \url{dbk726@alumni.ku.dk} }
@@ -39,6 +44,11 @@ less(s(X), s(Y)) :- less(X,Y).
 If the first argument is \texttt{z}, and the other some \texttt{s} constructor containing any other number, then we succeed, because \texttt{z} is less than any other natural number.
 
 On the other hand, if we have two functors \texttt{s(X)}, and \texttt{s(Y)}, we strip those off and consider the recursive application of \texttt{less(X, Y)}.
+\item[\pfuncn{different}{2}] We implemented this helper predicate for use in later predicates. Two numbers are considered different if either the first is less than the second or the second is less than the first:
+\begin{lstlisting}[language=prolog]
+different(X,Y) :- less(X,Y).
+different(X,Y) :- less(Y,X).
+\end{lstlisting}
 \item[\pfuncn{checkset}{1}] This one is rather simple, using \pfuncn{less}{2}.
 
 A list is a valid set if it is either empty, it contains only one number, or it contains several numbers, where each number is bigger than the one before.  We therefore get the predicate 
@@ -49,31 +59,82 @@ checkset([A,B|C]) :-
 	less(A,B), 
 	checkset([B|C]).
 \end{lstlisting}
-\item[\pfuncn{ismember}{3}] As is specified in the assignment text, whenever $t_1$ does not represent a number, or $t_2$ does not represent a set, the behaviour is unconstrained %%, meaning we can do basically whatever we please.
-  This means in particular that we don't have to explicitly check whether $t_1$ or $t_2$ are `wellformed'.
+\item[\pfuncn{ismember}{3}] Our implementation has a somewhat counterintuitive recursive definition. Here is the definition:
+  \begin{lstlisting}[language=prolog]
+ismember(_, [], no).
+ismember(X, [X|Z], yes) :-
+        checkset([X|Z]).
+ismember(X, [Y|Z], P) :-
+	ismember(X, Z, P),
+        checkset([Y|Z]),
+        different(X,Y).
+\end{lstlisting}
+The base case is hopefully self-explanatory. The \texttt{yes}-case only has the subgoal that \texttt{[X|Z]} is a proper set. If that is the case then we also know that \plVar{X} is a number by our definition.
 
-  One \emph{could} use the predicate \pfunc{checkset} in the definition of \pfunc{ismember}, but doing so results in a lot of duplicate instances, so we haven't used it for that reason. This means however that \pfunc{checkset} will find solutions in improper sets (un-ordered, or otherwise). TODO: Rephrase.
+In the final case, we start by recursively querying \texttt{ismember(X, Z, P)}. If our set is finite, the recursive calls to \pfunc{ismember} will eventually terminate. Then we make sure \plVar{[Y|Z]} is a proper set. Finally for this goal to succeed we require that \plVar{X} is different from \plVar{Y}.
 
-  We consider the query, and its output in Prolog:
+The reason the subgoal \pfunc{different} appears at the end of the subgoal, is that querying \pfunc{different} with \emph{any} unbound variables will result in an infinite enumeration, and we'd never terminate in certain modes if we placed it before the recursive application.
+
+We consider the following query, and its output in Prolog:
+\begin{center}
+\texttt{?- ismember(N, [s(z), s(s(s(z)))], A).}
+\end{center}
+
+\begin{enumerate}\setlength{\itemsep}{-3pt}
+\item \code{ismember(N, [s(z), s(s(s(z)))], A).} False
+\item \code{ismember(N, [s(z), s(s(s(z)))], A).} True, matching \plVar{N} = \plVar{s(z)}, \plVar{A} = \plVar{yes}
+\item \code{ismember(N, [s(z), s(s(s(z)))], A).} We match \plVar{Y} = \plVar{s(z)}, \plVar{Z} = \plVar{[s(s(s(z)))]} and must first consider the subgoal \code{ismember(N, [s(s(s(z)))], A)}:
+  \begin{enumerate}[label*=\arabic*.]
+    \item \code{ismember(N, [s(s(s(z)))], A).} False
+    \item \code{ismember(N, [s(s(s(z)))], A).} True, with \plVar{N} = \plVar{s(s(s(z)))} \plVar{A} = \plVar{yes}
+    \item \code{ismember(N, [s(s(s(z)))], A).} We match \plVar{Y} = \plVar{s(s(s(z)))}, \plVar{Z} = \plVar{[]} and must first consider the subgoal \code{ismember(N, [], A).}
+      \begin{enumerate}[label*=\arabic*.]
+      \item \code{ismember(N, [], A).} True, matching \plVar{A} = \plVar{no}.
+      \item \code{ismember(N, [], A).} False. Cannot match the empty list.
+      \item \code{ismember(N, [], A).} False.
+      \end{enumerate}
+      At this point \plVar{A} is bound to \plVar{no}. We next consider \code{checkset([s(s(s(z)))])} which succeeds, and must finally satisfy \code{different(N, s(s(s(z))))}. The first \plVar{N} that satisfies this predicate is (by our definition of \pfunc{different} and \pfunc{less}) \plVar{N} = \plVar{z}.
+  \end{enumerate}
+  Now we do \code{checkset([s(z), s(s(s(z)))])}, which succeeds and we consider \code{different(N, s(z))}. We have two different bindings for \plVar{N} and \plVar{A}. Firstly, from 3.2, \plVar{N} = \plVar{s(s(s(z)))} and \plVar{A} = \plVar{yes}, which succeeds. Secondly, we have, from 3.3, \plVar{N} = \plVar{z} and \plVar{A} = \plVar{no}, which also succeeds.
+\end{enumerate}
+
+At this point, we unbind the last thing we bound, which was \plVar{N} in 3.3. By our definition of \pfunc{different}, the next binding will be \plVar{N} = \plVar{s(z)}. This also has to go through the check in 3, where \plVar{Y} = \plVar{s(z)}, in which case \code{different(N, Y)} fails, not producing a result.
+
+Then we unbind \plVar{N} again, and the ``inner'' \pfunc{different} produces \plVar{N} = \plVar{s(s(z))}, which succeeds in the outer check, giving a solution \plVar{N} = \plVar{s(s(z))} and \plVar{A} = \plVar{no}. Note that the binding of \plVar{A} happened in 3.2, and is therefore still bound.
+
+From here on, the inner \pfunc{different} simply enumerates all numbers (skipping \plVar{s(s(s(z)))}), and will produce a solution for each of them, since the outer \pfunc{different} will also succeed. The following displays part of the output for the query:
+
 \begin{lstlisting}[language=prolog]
 ?- ismember(N, [s(z), s(s(s(z)))], A).
 N = s(z),
 A = yes ;
-N = z,
-A = no ;
 N = s(s(s(z))),
 A = yes ;
+N = z,
+A = no ;
 N = s(s(z)),
 A = no ;
-N = s(s(s(s(_G35)))),
+N = s(s(s(s(z)))),
 A = no ;
-false.
+N = s(s(s(s(s(z))))),
+A = no ;
+N = s(s(s(s(s(s(z)))))),
+A = no ;
+N = s(s(s(s(s(s(s(z))))))),
+A = no ;
+N = s(s(s(s(s(s(s(s(z)))))))),
+A = no ;
+N = s(s(s(s(s(s(s(s(s(z))))))))),
+A = no ;
+N = s(s(s(s(s(s(s(s(s(s(...)))))))))),
+A = no .
 \end{lstlisting}
-\item[\pfuncn{union}{3}]\hfill
-  \begin{quotation}\itshape
-    Write a predicate \pfuncn{union}{3}, such that, if $t_1$, $t_2$ and $t_3$ represent $s_1$, $s_2$ and $s_3$ respectively, $\pfunc{union}(t_1, t_2, t_3)$ succeeds iff $s_3 = s_1 \cup s_2$.
-  \end{quotation}
-  Here we make use of the fact that a valid set representation contains all elements in ascending order (and, as usual, make sure that our inputs are in fact valid sets by using $\pfuncn{checkset}{1}$). This means that the first (and therefore smallest) element of $t_3$ must necessarily also be the first element of either $t_1$, $t_2$ or both. Consider the case where $t_1$ and $t_3$ have the same first element. We can remove those first elements from the lists, and the resulting lists $t_1'$ and $t_3'$ must again be representations of sets so that $s_3' = s_1' \cup s_2$. The case where the first elements of $t_2$ and $t_3$ are equal is analogous. If all three lists start with the same element, we remove the element from all three lists and apply $\pfuncn{union}{3}$ on the remaining lists. Finally, the union of two empty sets is again an empty set. 
+
+Another interesting query is \texttt{ismember(s(z), Y, yes).} Then we start enumerating the (proper) sets of which \plVar{s(z)} is a member. This enumeration can of course continue forever. 
+
+\item[\pfuncn{union}{3}] Here we make use of the fact that a valid set representation contains all elements in ascending order (and, as usual, make sure that our inputs are in fact valid sets by using $\pfuncn{checkset}{1}$). This means that the first (and therefore smallest) element of $t_3$ must necessarily also be the first element of either $t_1$, $t_2$ or both. 
+
+Consider the case where only $t_1$ and $t_3$ have the same first element. We can remove those first elements from the lists, and the resulting lists $t_1'$ and $t_3'$ must again be representations of sets so that $s_3' = s_1' \cup s_2$. The case where the first elements of $t_2$ and $t_3$ are equal is analogous. If all three lists start with the same element, we remove the element from all three lists and apply $\pfuncn{union}{3}$ on the remaining lists. Finally, the union of two empty sets is again an empty set. 
   
   The resulting predicate looks like this:
   \begin{lstlisting}[language=prolog]
@@ -96,9 +157,7 @@ union([H|B],[H|R],[H|T]) :-
 \end{lstlisting}
 
 Note that with this predicate, all of the three latter rules will be matched if the first element is the same in all lists. However, evaluation of the former two will fail in the next step, so this is not a problem.
-\item[\pfuncn{intersection}{3}]. Same as above, but the query $\pfunc{intersection}(t_1,t_2,t_3)$ succeeds iff $s_3 = s_1 \cap s_2$.
-
-The implementation is similar to that of \texttt{union}. We have two cases here: Either all three lists start with the same element, or they do not. In the former case, like in the $\pfuncn{union}{3}$ predicate, the remaining lists without the first element have to satisfy the $\pfuncn{intersection}{3}$ predicate as well, so we just use it recursively. In the case where the first elements of $t_1$ and $t_2$ are different, we use $\pfuncn{less}{2}$ to determine the smaller one, and make sure that all lists without this element also satisfy $\pfuncn{intersection}{3}$. For example, if we find that $t_1$ starts with the smallest number and $t_1'$ is $t_1$ without this number, we must have that $s_3 = s_1' \cap s_2$. 
+\item[\pfuncn{intersection}{3}] The implementation is similar to that of \texttt{union}. We have two cases here: Either all three lists start with the same element, or at least one of them starts with a different one. In the former case, like in the $\pfuncn{union}{3}$ predicate, the remaining lists without the first element have to satisfy the $\pfuncn{intersection}{3}$ predicate as well, so we just use it recursively. In the case where the first elements of $t_1$ and $t_2$ are different, we use $\pfuncn{less}{2}$ to determine the smaller one, and make sure that after removing this element, all lists still satisfy $\pfuncn{intersection}{3}$. For example, if we find that $t_1$ starts with the smallest number and $t_1'$ is $t_1$ without this number, we must have that $s_3 = s_1' \cap s_2$. 
 
 Again, we have special rules for empty sets: The intersection of any set with an empty set is the empty set, and so is of course the intersection of two empty sets. We need three distinct rules for this in order to cover all cases without getting duplicate results. 
 
@@ -128,7 +187,11 @@ intersection([],[],[]).
 \end{description}
 
 \section*{Assessment}
+We think that our code satisfies the specification and in general does what is intended to do. We tested all (modes of all) predicates with finite output using \texttt{plunit} (see file \texttt{tests.pl} information on the specific tests) and manually checked the cases with infinite output, since \texttt{plunit} cannot handle those. 
 
+We managed to avoid duplicates for all required cases, and as far as we know we always explicitly fail instead of going into infinite loops. Whereever possible, we explicitly made sure that invalid input is not accepted (using $\pfuncn{checkset}{1}$ and $\pfuncn{num}{1}$) in order to ensure that, if a variable is left unbound, our output will be valid. 
+
+%% We overfulfilled the requirements in several places, making sure that our predicates also work in modes not required by the assignment text; for example, our $\pfuncn{intersection}{3}$ predicate also works correctly if either $t_1$ or $t_2$ (but not both) are unbound.
 
 
 \end{document}
