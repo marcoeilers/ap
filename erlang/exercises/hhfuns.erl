@@ -31,3 +31,11 @@ zipWith(_, _, []) ->
     [];
 zipWith(F, [H1|T1], [H2|T2]) ->
     [F(H1, H2)|zipWith(F,T1,T2)].
+
+
+a() ->
+    Secret = "pony",
+    fun() -> Secret end.
+
+b(F) ->
+    "a/0's password is " ++ F().
