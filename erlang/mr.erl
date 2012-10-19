@@ -4,8 +4,8 @@
 %%% Created : Oct 2011 by Ken Friis Larsen <kflarsen@diku.dk>
 %%%-------------------------------------------------------------------
 -module(mr).
--export([start/1, stop/1, job/5]).
-
+%-export([start/1, stop/1, job/5]).
+-compile(export_all).
 %%%% Interface
 
 start(N) ->
@@ -13,7 +13,8 @@ start(N) ->
     {ok, spawn(fun() -> coordinator_loop(Reducer, Mappers) end)}.
 
 
-stop(Pid) -> ....
+stop(CPid) ->
+    rpc(CPid, stop).
 
 
 %%
@@ -22,13 +23,16 @@ stop(Pid) -> ....
 %% RedFun: Reducing function (:: a -> res -> res)
 %% Initial: Initial value for the coordinator
 %% Data: The data that should be processed
-job(CPid, MapFun, RedFun, RedInit, Data) -> ....
+
+%%job(CPid, MapFun, RedFun, RedInit, Data) -> 
 
 
 %%%% Internal implementation
 
 
-init(N) -> ....
+init(N) -> Red = spawn(fun reducer_loop/0), %%spawn(?MODULE, reducer_loop, []),
+	   { Red, [spawn(fun() -> mapper_loop(Red, fun(Y) -> Y end) end) || _ <- lists:seq(1,10) ] }.
+    
 
 
 %% synchronous communication
@@ -73,8 +77,8 @@ coordinator_loop(Reducer, Mappers) ->
 	    io:format("~p stopping~n", [self()]),
 	    lists:foreach(fun stop_async/1, Mappers),
 	    stop_async(Reducer),
-	    reply_ok(From);
-	....
+	    reply_ok(From)
+	%....
     end.
 
 
@@ -95,14 +99,14 @@ reducer_loop() ->
     receive
 	stop -> 
 	    io:format("Reducer ~p stopping~n", [self()]),
-	    ok;
-	....
+	    ok
+	%....
     end.
 
-gather_data_from_mappers(Fun, Acc, Missing) ->
-    receive
-	...
-    end.
+%% gather_data_from_mappers(Fun, Acc, Missing) ->
+%%     receive
+%% 	...
+%%     end.
 
 
 %%% Mapper
@@ -112,7 +116,7 @@ mapper_loop(Reducer, Fun) ->
 	stop -> 
 	    io:format("Mapper ~p stopping~n", [self()]),
 	    ok;
-	....
+	%....
 	Unknown ->
 	    io:format("unknown message: ~p~n",[Unknown]), 
 	    mapper_loop(Reducer, Fun)
