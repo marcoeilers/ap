@@ -5,12 +5,13 @@
 %%%-------------------------------------------------------------------
 -module(mr).
 -export([start/1, stop/1, job/5]).
--compile(export_all).
+%%-compile(export_all).
+
 %%%% Interface
 
 start(N) ->
     {Reducer, Mappers} = init(N),
-    {ok, spawn(fun() -> coordinator_loop(Reducer, Mappers) end)}.
+    {ok, spawn(?MODULE, coordinator_loop, [Reducer, Mappers])}.
 
 status(CPid) ->
     rpc(CPid, status).
@@ -32,8 +33,9 @@ job(CPid, MapFun, RedFun, RedInit, Data) ->
 %%%% Internal implementation
 
 
-init(N) -> Red = spawn(fun reducer_loop/0), %%spawn(?MODULE, reducer_loop, []),
-	   { Red, [spawn(fun() -> mapper_loop(Red, id()) end) || _ <- lists:seq(1,N) ] }.
+init(N) ->
+    Red = spawn(?MODULE, reducer_loop, []),
+    {Red, [spawn(?MODULE, mapper_loop, [Red, id()]) || _ <- lists:seq(1,N) ]}.
 
 %% Function that generates the id function.
 id() ->
@@ -90,10 +92,12 @@ coordinator_loop(Reducer, Mappers) ->
 	{From, {job, MapFun, RedFun, RedInit, Data}} ->
 	    %% Uh, update mappers and reducers, split data and start processing
 	    lists:foreach(fun(M) -> setup_async(M, MapFun) end, Mappers),
+
+	    send_data(Mappers, Data),
+
 	    reply_ok(From, executed),
 	    coordinator_loop(Reducer, Mappers)
     end.
-
 
 send_data(Mappers, Data) ->
     send_loop(Mappers, Mappers, Data).
@@ -104,14 +108,6 @@ send_loop(Mappers, [Mid|Queue], [D|Data]) ->
 send_loop(_, _, []) -> ok;
 send_loop(Mappers, [], Data) ->
     send_loop(Mappers, Mappers, Data).
-
-
-%% Safer split function - doesn't choke when N > length(List)
-splitAt(N, List) when N =< length(List) ->
-    lists:split(N, List);
-splitAt(_, List) ->
-    {List, []}.
-
 
 
 %%% Reducer
@@ -138,7 +134,7 @@ mapper_loop(Reducer, Fun) ->
 	    io:format("Mapper ~p stopping~n", [self()]),
 	    ok;
 	{data, D} ->
-	    io:format("Mapper ~p received data ~p", [self(), D]),
+	    io:format("Mapper ~p received data <~p>~n", [self(), D]),
 	    mapper_loop(Reducer, Fun);
 	{setup, NewFun} ->
 	    io:format("Mapper ~p received new mapper function~n", [self()]),
