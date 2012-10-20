@@ -31,7 +31,7 @@ stop(CPid) ->
 
 
 init(N) -> Red = spawn(fun reducer_loop/0), %%spawn(?MODULE, reducer_loop, []),
-	   { Red, [spawn(fun() -> mapper_loop(Red, fun(Y) -> Y end) end) || _ <- lists:seq(1,10) ] }.
+	   { Red, [spawn(fun() -> mapper_loop(Red, fun(Y) -> Y end) end) || _ <- lists:seq(1,N) ] }.
     
 
 
