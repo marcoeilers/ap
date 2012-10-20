@@ -4,14 +4,14 @@
 %%% Created : Oct 2011 by Ken Friis Larsen <kflarsen@diku.dk>
 %%%-------------------------------------------------------------------
 -module(mr).
--export([start/1, stop/1, job/5]).
-%%-compile(export_all).
+-export([start/1, stop/1, job/5, status/1]).
+-compile(debug_all).
 
 %%%% Interface
 
 start(N) ->
     {Reducer, Mappers} = init(N),
-    {ok, spawn(?MODULE, coordinator_loop, [Reducer, Mappers])}.
+    {ok, spawn(fun() -> coordinator_loop(Reducer, Mappers) end)}.
 
 status(CPid) ->
     rpc(CPid, status).
@@ -34,8 +34,8 @@ job(CPid, MapFun, RedFun, RedInit, Data) ->
 
 
 init(N) ->
-    Red = spawn(?MODULE, reducer_loop, []),
-    {Red, [spawn(?MODULE, mapper_loop, [Red, id()]) || _ <- lists:seq(1,N) ]}.
+    Red = spawn(fun reducer_loop/0),
+    {Red, [spawn(fun() -> mapper_loop(Red, id()) end) || _ <- lists:seq(1,N) ]}.
 
 %% Function that generates the id function.
 id() ->
@@ -92,9 +92,12 @@ coordinator_loop(Reducer, Mappers) ->
 	{From, {job, MapFun, RedFun, RedInit, Data}} ->
 	    %% Uh, update mappers and reducers, split data and start processing
 	    lists:foreach(fun(M) -> setup_async(M, MapFun) end, Mappers),
-
+	    
 	    send_data(Mappers, Data),
-
+	    
+	    %% Wait for the reducer to return something
+	    
+	    
 	    reply_ok(From, executed),
 	    coordinator_loop(Reducer, Mappers)
     end.
@@ -112,17 +115,23 @@ send_loop(Mappers, [], Data) ->
 
 %%% Reducer
 
+%% The reducer loop is only for synchronous communication whereas
+%% gather_data_from_mappers is asynchronous.
+
 reducer_loop() ->
     receive
 	stop -> 
 	    io:format("Reducer ~p stopping~n", [self()]),
-	    ok
-	%....
+	    ok;
+	{data, D} ->
+	    io:format("Received input from mapper <~p>~n", D),
+	    reducer_loop()
     end.
 
 %% gather_data_from_mappers(Fun, Acc, Missing) ->
 %%     receive
-%% 	...
+%% 	{data, D} -> 
+%% 	    NewAcc = Fun(D, Acc),
 %%     end.
 
 
@@ -135,6 +144,7 @@ mapper_loop(Reducer, Fun) ->
 	    ok;
 	{data, D} ->
 	    io:format("Mapper ~p received data <~p>~n", [self(), D]),
+	    data_async(Reducer, Fun(D)),
 	    mapper_loop(Reducer, Fun);
 	{setup, NewFun} ->
 	    io:format("Mapper ~p received new mapper function~n", [self()]),
