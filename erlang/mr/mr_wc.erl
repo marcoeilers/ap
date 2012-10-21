@@ -40,6 +40,10 @@ compute_averages(MR, {Words, Tracks}) ->
 %% For a given word, find the MSD track ID's for all songs with that word.
 %% Words: List of words
 %% Tracks: List of tracks - 
+%% Mapper:  Output Song Id + plus list of word indices
+%% Reducer: Figure if our given song should be added to the list of
+%%          songs containing WordIdx
+
 grep(MR, Word, {Words, Tracks}) ->
     WordIdx = index_of(Word, Words),
     {ok, Result} = mr:job(MR,
@@ -62,25 +66,35 @@ grep(MR, Word, {Words, Tracks}) ->
 
 
 %% Compute a reverse index, that is, a mapping from words to songs where they occur
+%%
+%% Mapper:  Same as grep, output {SongId, [Index]}
+%% Reducer: Fold the id's over the dictionary, first getting the word
+%%          (by index), then updating the dictionary using Word as key
+%%          appending the song id if it already exists, otherwise
+%%          start a new list.
 reverse_index(MR, {Words, Tracks}) ->
     {ok, Result} = mr:job(MR,
 			  fun(Track) ->
 				  {_, MXMID, WordBags} = read_mxm:parse_track(Track),
-				  lists:map(fun({Idx,_}) -> {Idx, MXMID} end, WordBags)
+				  {Idxs,_} = lists:unzip(WordBags),
+				  {MXMID, Idxs}
 			  end,
-			  fun(List, Dict) ->
-				  lists:foldl(fun({Idx, MXMID}, D) ->
+			  fun({MXMID, Idxs}, Dict) ->
+				  lists:foldl(fun(Idx, D) ->
 						      Word = lists:nth(Idx, Words),
-						      dict:update(Word, fun(L) -> [MXMID|L] end, MXMID, D)
+						      dict:update(Word, fun(L) -> [MXMID|L] end, [MXMID], D)
 					      end,
 					      Dict,
-					      List)
+					      Idxs)
 			  end,
 			  dict:new(),
 			  Tracks),
     Result.
-    
 
+%% > RevIdx = mr_wc:reverse_index(MR, {Words, Tracks}).
+%% > length(dict:fetch("love", RevIdx)). #=> 8188
+
+%%% Utility functions
 index_of(Item, List) ->
     index_of(Item, List, 1).
 
