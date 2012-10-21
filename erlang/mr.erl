@@ -4,10 +4,10 @@
 %%% Created : Oct 2011 by Ken Friis Larsen <kflarsen@diku.dk>
 %%%-------------------------------------------------------------------
 -module(mr).
--export([start/1, stop/1, job/5, status/1,test_sum/0,test_fac/0]).
+-export([start/1, stop/1, job/5, status/1]).
 -compile(debug_all).
 
--define(else, true). % Nice little hack.
+-define(otherwise, true). % Nice little hack.
 %%%% Interface
 
 start(N) ->
@@ -97,7 +97,7 @@ coordinator_loop(Reducer, Mappers) ->
 	    send_data(Mappers, Data),
 
 	    %% Wait for the reducer to return something
-	    {ok, Result} = rpc(Reducer, {start, {RedFun, RedInit, lists:seq(1,length(Data)-1)}}),
+	    {ok, Result} = rpc(Reducer, {job, {RedFun, RedInit, length(Data)}}),
 	    
 	    reply_ok(From, Result),
 
@@ -123,8 +123,8 @@ reducer_loop() ->
 	stop -> 
 	    io:format("Reducer ~p stopping~n", [self()]),
 	    ok;
-	{From, {start, {Fun, Acc, Missing}}} ->
-	    io:format("Reducer received start signal~n"),
+	{From, {job, {Fun, Acc, Missing}}} ->
+	    io:format("Reducer received new job~n"),
 	    reply_ok(From, gather_data_from_mappers(Fun, Acc, Missing)),
 	    reducer_loop()
     end.
@@ -135,13 +135,12 @@ gather_data_from_mappers(Fun, Acc, Missing) ->
 	{data, Data} ->
 	    io:format("Reducer received data <~p>~n", [Data]),
 	    NAcc = Fun(Data, Acc),
-	    %% TODO Figure out something smarter
-	    case Missing of
-		[_|T] ->
-		    io:format("More data to come; state is now: Acc: ~p, Missing: ~p~n", [Acc, Missing]),
-		    gather_data_from_mappers(Fun, NAcc, T);
-		[] ->
-		    io:format("Have we reached the end here?~n"),
+	    if
+		Missing > 1 ->
+		    io:format("More data to come; state is now: Acc: ~p, Missing: ~p~n", [Acc, Missing-1]),
+		    gather_data_from_mappers(Fun, NAcc, Missing-1);
+		?otherwise ->
+		    io:format("Finished~n"),
 		    NAcc
 	    end
     after 5000 ->
@@ -171,24 +170,3 @@ mapper_loop(Reducer, Fun) ->
 	    mapper_loop(Reducer, Fun)
     end.
 
-
-%%% Test section
-test_sum() ->
-    {ok,MR} = mr:start(3),
-    {ok,Sum} = mr:job(MR,
-		      fun(X) -> X end,
-		      fun(X, Acc) -> X+Acc end,
-		      0,
-		      lists:seq(1,10)),
-    mr:stop(MR),
-    Sum.
-
-test_fac() ->
-    {ok,MR} = mr:start(3),
-    {ok,Fac} = mr:job(MR,
-		      fun(X) -> X end,
-		      fun(X,Acc) -> X*Acc end,
-		      1,
-		      lists:seq(1,10)),
-    mr:stop(MR),
-    Fac.
