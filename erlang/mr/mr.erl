@@ -134,11 +134,9 @@ reducer_loop() ->
 gather_data_from_mappers(Fun, Acc, Missing) ->
     receive
 	{data, Data} ->
-	    io:format("Reducer received data <~p>~n", [Data]),
 	    NAcc = Fun(Data, Acc),
 	    if
 		Missing > 1 ->
-		    io:format("More data to come; state is now: Acc: ~p, Missing: ~p~n", [Acc, Missing-1]),
 		    gather_data_from_mappers(Fun, NAcc, Missing-1);
 		?otherwise ->
 		    io:format("Finished~n"),
@@ -149,9 +147,6 @@ gather_data_from_mappers(Fun, Acc, Missing) ->
 	    Acc
     end.
 
-
-
-
 %%% Mapper
 
 mapper_loop(Reducer, Fun) ->
@@ -160,7 +155,6 @@ mapper_loop(Reducer, Fun) ->
 	    io:format("Mapper ~p stopping~n", [self()]),
 	    ok;
 	{data, D} ->
-	    io:format("Mapper ~p received data <~p>~n", [self(), D]),
 	    data_async(Reducer, Fun(D)),
 	    mapper_loop(Reducer, Fun);
 	{setup, NewFun} ->
