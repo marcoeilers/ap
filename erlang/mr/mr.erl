@@ -130,6 +130,7 @@ reducer_loop() ->
     end.
 
 %% Active reducer.
+%% Missing is assumed to be the length of the input. This is simple and crude but it works.
 gather_data_from_mappers(Fun, Acc, Missing) ->
     receive
 	{data, Data} ->
