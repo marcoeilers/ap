@@ -4,9 +4,10 @@
 %%% Created : Oct 2011 by Ken Friis Larsen <kflarsen@diku.dk>
 %%%-------------------------------------------------------------------
 -module(mr).
--export([start/1, stop/1, job/5, status/1]).
+-export([start/1, stop/1, job/5, status/1,test_sum/0,test_fac/0]).
 -compile(debug_all).
 
+-define(else, true). % Nice little hack.
 %%%% Interface
 
 start(N) ->
@@ -92,13 +93,14 @@ coordinator_loop(Reducer, Mappers) ->
 	{From, {job, MapFun, RedFun, RedInit, Data}} ->
 	    %% Uh, update mappers and reducers, split data and start processing
 	    lists:foreach(fun(M) -> setup_async(M, MapFun) end, Mappers),
-	    
+
 	    send_data(Mappers, Data),
-	    
+
 	    %% Wait for the reducer to return something
+	    {ok, Result} = rpc(Reducer, {start, {RedFun, RedInit, lists:seq(1,length(Data)-1)}}),
 	    
-	    
-	    reply_ok(From, executed),
+	    reply_ok(From, Result),
+
 	    coordinator_loop(Reducer, Mappers)
     end.
 
@@ -115,24 +117,39 @@ send_loop(Mappers, [], Data) ->
 
 %%% Reducer
 
-%% The reducer loop is only for synchronous communication whereas
-%% gather_data_from_mappers is asynchronous.
-
+%% The idle reducer state
 reducer_loop() ->
     receive
 	stop -> 
 	    io:format("Reducer ~p stopping~n", [self()]),
 	    ok;
-	{data, D} ->
-	    io:format("Received input from mapper <~p>~n", D),
+	{From, {start, {Fun, Acc, Missing}}} ->
+	    io:format("Reducer received start signal~n"),
+	    reply_ok(From, gather_data_from_mappers(Fun, Acc, Missing)),
 	    reducer_loop()
     end.
 
-%% gather_data_from_mappers(Fun, Acc, Missing) ->
-%%     receive
-%% 	{data, D} -> 
-%% 	    NewAcc = Fun(D, Acc),
-%%     end.
+%% Active reducer.
+gather_data_from_mappers(Fun, Acc, Missing) ->
+    receive
+	{data, Data} ->
+	    io:format("Reducer received data <~p>~n", [Data]),
+	    NAcc = Fun(Data, Acc),
+	    %% TODO Figure out something smarter
+	    case Missing of
+		[_|T] ->
+		    io:format("More data to come; state is now: Acc: ~p, Missing: ~p~n", [Acc, Missing]),
+		    gather_data_from_mappers(Fun, NAcc, T);
+		[] ->
+		    io:format("Have we reached the end here?~n"),
+		    NAcc
+	    end
+    after 5000 ->
+	    io:format("Timed out - state is now: Acc: ~p, Missing: ~p~n", [Acc, Missing]),
+	    Acc
+    end.
+
+
 
 
 %%% Mapper
@@ -153,3 +170,25 @@ mapper_loop(Reducer, Fun) ->
 	    io:format("unknown message: ~p~n",[Unknown]), 
 	    mapper_loop(Reducer, Fun)
     end.
+
+
+%%% Test section
+test_sum() ->
+    {ok,MR} = mr:start(3),
+    {ok,Sum} = mr:job(MR,
+		      fun(X) -> X end,
+		      fun(X, Acc) -> X+Acc end,
+		      0,
+		      lists:seq(1,10)),
+    mr:stop(MR),
+    Sum.
+
+test_fac() ->
+    {ok,MR} = mr:start(3),
+    {ok,Fac} = mr:job(MR,
+		      fun(X) -> X end,
+		      fun(X,Acc) -> X*Acc end,
+		      1,
+		      lists:seq(1,10)),
+    mr:stop(MR),
+    Fac.
