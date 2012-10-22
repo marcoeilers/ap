@@ -1,4 +1,25 @@
-%% Use the mr as a wc.
+%%%-------------------------------------------------------------------
+%%% @doc
+%%%
+%%% Use the mr as a wc.
+%%%
+%%% Example usage (interpreter).
+%%%
+%%% 1> c(mr).
+%%% 2> c(mr_wc).
+%%% 3> c(read_mxm).
+%%% 4> {Words, Tracks} = read_mxm:from_file("mxm_dataset_test.txt").
+%%% 5> {ok, MR} = mr:start(8).
+%%% 6> RevIdx = mr_wc:reverse_index(MR, {Words, Tracks}).
+%%%
+%%% Now you can do something like:
+%%%
+%%% 7> dict:fetch("love", RevIdx).
+%%%
+%%% which returns a list of all songs that have the word "love".
+%%%
+%%% @end
+%%%-------------------------------------------------------------------
 -module(mr_wc).
 -compile(export_all).
 -define(otherwise, true).
