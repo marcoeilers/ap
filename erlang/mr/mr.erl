@@ -11,10 +11,10 @@
 %%%% Interface
 
 start(N) ->
-    {Reducer, Mappers} = init(N),
-    {ok, spawn(fun() -> %%process_flag(trap_exit, true),
+    %%{Reducer, Mappers} = init(N),
+    {ok, spawn(fun() -> coordinator(N) end)}. %%process_flag(trap_exit, true),
 			
-			coordinator_loop(Reducer, Mappers) end)}.
+%%coordinator_loop(Reducer, Mappers) end)}.
 
 status(CPid) ->
     rpc(CPid, status).
@@ -36,9 +36,9 @@ job(CPid, MapFun, RedFun, RedInit, Data) ->
 %%%% Internal implementation
 
 
-init(N) ->
-    Red = spawn(fun reducer_loop/0),
-    {Red, [spawn(fun() -> mapper_loop(Red, id()) end) || _ <- lists:seq(1,N) ]}.
+%% init(N) ->
+%%     Red = spawn(fun reducer_loop/0),
+%%     {Red, [spawn(fun() -> mapper_loop(Red, id()) end) || _ <- lists:seq(1,N) ]}.
 
 %% Function that generates the id function.
 id() ->
@@ -79,11 +79,25 @@ data_async(Pid, D) ->
 setup_async(Pid, Fun) ->
     info(Pid, {setup, Fun}).
 
+reducer_async(Pid, Red) ->
+    info(Pid, {reducer, Red}).
 
 %%% Coordinator
-coordinator(Reducer, Mappers) ->
+%% setup(N) ->
+%%     process_flag(trap_exit,true),
+%%     Red = rde,
+%%     Maps = maps,
+%%     Cord = cord,
+%%     supervise(entire_thing).
+
+%% setup
+
+coordinator(N) ->
     process_flag(trap_exit, true),
-    coordinator_loop(Reducer, Mappers).
+    Red = spawn_link(fun reducer_loop/0),
+    Mps = [spawn_link(fun() -> mapper_loop(Red, id()) end) || _ <- lists:seq(1,N) ],
+    coordinator_loop(Red, Mps).
+
 
 coordinator_loop(Reducer, Mappers) ->
     receive
@@ -107,7 +121,23 @@ coordinator_loop(Reducer, Mappers) ->
 
 	    From ! {Ref, {ok, Result}},				  
 
-	    coordinator_loop(Reducer, Mappers)
+	    coordinator_loop(Reducer, Mappers);
+	%% Accidentally safe, because exit received here, means the entire thing is idle...
+	{'EXIT', Pid, Reason } ->
+	    io:format("~p exited because of ~p~n", [Pid, Reason]),
+
+	    if Pid =:= Reducer -> 
+	    	    %% Reducer died
+		    NewRed = spawn_link(fun reducer_loop/0),
+		    %% Inform mappers of new reducer.
+		    lists:foreach(fun(M) -> reducer_async(M, NewRed) end, Mappers),
+		    coordinator_loop(NewRed, Mappers);
+	       ?otherwise ->
+	    	    %% Mapper died
+		    NewMapper = spawn_link(fun() -> mapper_loop(Reducer, id()) end),
+		    NewMappers = [NewMapper|lists:delete(Pid, Mappers)],
+		    coordinator_loop(Reducer, NewMappers)
+	    end
     end.
 
 send_data(Mappers, Data) ->
@@ -160,6 +190,8 @@ mapper_loop(Reducer, Fun) ->
 	stop -> 
 	    io:format("Mapper ~p stopping~n", [self()]),
 	    ok;
+	{reducer, RedFun} ->
+	    mapper_loop(RedFun, Fun);
 	{data, D} ->
 	    data_async(Reducer, Fun(D)),
 	    mapper_loop(Reducer, Fun);
