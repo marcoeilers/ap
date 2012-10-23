@@ -1,0 +1,22 @@
+#+TITLE: Erlang notes for AP
+#+AUTHOR: 
+#+EMAIL:
+#+TEXT: Small collection of useful Erlang resources, collected throughout the course Advanced Programming.
+#+STARTUP: showall
+#+OPTIONS: ^:nil
+
+* Online resources
+ - [[http://www.erlang.org/doc/index.html]] :: The official documentation
+ - [[http://erldocs.com/R15B/]] :: Has a nice search function
+ - [[http://www.cis.upenn.edu/~matuszek/General/ConciseGuides/concise-erlang.html][A Concise Guide to Erlang]] :: Good overview of syntax
+ - [[http://www.erlang.org/course/sequential_programming.html]] :: Another concise overview
+ - [[http://learnyousomeerlang.com/][Learn You Some Erlang for Great Good!]] :: Thorough introduction to the language
+ - 
+
+* Map-Reduce
+ - [[http://horicky.blogspot.dk/2008/06/exploring-erlang-with-mapreduce.html]] :: Some guy doing something with Erlang and Map-Reduce.
+ - 
+
+* Exercises
+ - [[http://www.erlang.org/course/exercises.html]] :: Exercises
+
