@@ -6,13 +6,13 @@ test_init_stop() ->
     mr:stop(CPid).
 
 test_sum() ->
-    {ok,MR} = mr:start(3),
-    {ok,Sum} = mr:job(MR,
+    mr:start(3, mrcord),
+    {ok,Sum} = mr:job(mrcord,
 		      fun(X) -> X end,
 		      fun(X, Acc) -> X+Acc end,
 		      0,
 		      lists:seq(1,10)),
-    mr:stop(MR),
+    mr:stop(mrcord),
     Sum.
 
 test_fac() ->

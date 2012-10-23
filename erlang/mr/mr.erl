@@ -4,34 +4,23 @@
 %%% Created : Oct 2011 by Ken Friis Larsen <kflarsen@diku.dk>
 %%%-------------------------------------------------------------------
 -module(mr).
--export([start/1, stop/1, job/5, status/1]).
+-export([start/2, stop/1, job/5, status/1]).
 -compile(debug_all).
 
 -define(otherwise, true). % Nice little hack.
 %%%% Interface
 
-start(N) ->
-    %%{Reducer, Mappers} = init(N),
-    {ok, spawn(fun() -> coordinator(N) end)}. %%process_flag(trap_exit, true),
-			
-%%coordinator_loop(Reducer, Mappers) end)}.
+start(N, Name) ->
+    setup(N, Name).
 
-status(CPid) ->
-    rpc(CPid, status).
+status(Name) ->
+    rpc(whereis(Name), status).
 
-stop(CPid) ->
-    rpc(CPid, stop).
+stop(Name) ->
+    rpc(whereis(Name), stop).
 
-
-%%
-%% CPid: Pid of coordinator process
-%% MapFun: Mapping function (:: a -> b)
-%% RedFun: Reducing function (:: a -> res -> res)
-%% Initial: Initial value for the coordinator
-%% Data: The data that should be processed
-
-job(CPid, MapFun, RedFun, RedInit, Data) -> 
-    rpc(CPid, {job, MapFun, RedFun, RedInit, Data}).
+job(Name, MapFun, RedFun, RedInit, Data) -> 
+    rpc(whereis(Name), {job, MapFun, RedFun, RedInit, Data}).
 
 %%%% Internal implementation
 
@@ -83,35 +72,67 @@ reducer_async(Pid, Red) ->
     info(Pid, {reducer, Red}).
 
 %%% Coordinator
-%% setup(N) ->
-%%     process_flag(trap_exit,true),
-%%     Red = rde,
-%%     Maps = maps,
-%%     Cord = cord,
-%%     supervise(entire_thing).
+setup(N, Name) -> spawn(fun() -> process_flag(trap_exit,true),
+				 Red = spawn_link(fun reducer_loop/0),
+				 Mps = [spawn_link(fun() -> mapper_loop(Red, id()) end) || _ <- lists:seq(1,N) ],
+				 This = self(),
+				 Crd = spawn_link(fun() -> coordinator_loop(This, Red, Mps) end),
+				 register(Name, Crd),
+				 supervise(Red, Mps, Crd, Name, idle)
+			end),
+		  ok.
 
-%% setup
+supervise(Reducer, Mappers, Cord, CordName, Idle) ->
+    receive
+	{'EXIT', _, normal } ->
+	    supervise(Reducer, Mappers, Cord, CordName, Idle);
+	{'EXIT', Pid, Reason } ->
+	    if Idle == idle ->
+		    if Pid =:= Reducer ->
+			    %% Reducer died
+			    NewRed = spawn_link(fun reducer_loop/0),
+			    lists:foreach(fun(M) -> reducer_async(M, NewRed) end, Mappers),
+			    info(Cord, {new_reducer, NewRed}),
+			    io:format("Reducer ~p exited because of ~p. Restarted as ~p~n", [Pid, Reason, NewRed]),
+			    supervise(NewRed, Mappers, Cord, CordName, Idle);
+		       Pid =:= Cord ->
+			    NewCord = spawn_link(fun() -> coordinator_loop(self(), Reducer, Mappers) end),
+			    register(CordName, NewCord),
+			    supervise(Reducer, Mappers, NewCord, CordName, Idle);
+		       ?otherwise ->
+			    %% Mapper died
+			    NewMapper = spawn_link(fun() -> mapper_loop(Reducer, id()) end),
+			    NewMappers = [NewMapper|lists:delete(Pid, Mappers)],
+			    info(Cord, {new_mappers, NewMappers}),
+			    io:format("Mapper ~p exited because of ~p. Restarted as ~p~n", [Pid, Reason, NewMapper]),
+			    supervise(Reducer, NewMappers, Cord, CordName, Idle)
+		    end;
+	       ?otherwise ->
+		    exit("Died in a job")
+	    end;
+	active ->
+	    supervise(Reducer, Mappers, Cord, CordName, active);
+	idle ->
+	    supervise(Reducer, Mappers, Cord, CordName, idle);
+	stop ->
+	    hammer_time
+    end.
 
-coordinator(N) ->
-    process_flag(trap_exit, true),
-    Red = spawn_link(fun reducer_loop/0),
-    Mps = [spawn_link(fun() -> mapper_loop(Red, id()) end) || _ <- lists:seq(1,N) ],
-    coordinator_loop(Red, Mps).
-
-
-coordinator_loop(Reducer, Mappers) ->
+coordinator_loop(Supervisor, Reducer, Mappers) ->
     receive
 	{From, Ref, stop} ->
 	    io:format("~p stopping~n", [self()]),
 	    lists:foreach(fun stop_async/1, Mappers),
 	    stop_async(Reducer),
+	    io:format("Stopping supervisor ~p~n", [Supervisor]),
+	    stop_async(Supervisor),
 	    From ! {Ref, ok};
 	{From, Ref, status} ->
 	    io:format("This is MR coordinator ~p managing ~B mappers.~n", [self(), length(Mappers)]),
 	    From ! {Ref, ok},
-	    coordinator_loop(Reducer, Mappers);
+	    coordinator_loop(Supervisor,Reducer, Mappers);
 	{From, Ref, {job, MapFun, RedFun, RedInit, Data}} ->
-	    %% Uh, update mappers and reducers, split data and start processing
+	    info(Supervisor, active),
 	    lists:foreach(fun(M) -> setup_async(M, MapFun) end, Mappers),
 
 	    send_data(Mappers, Data),
@@ -120,24 +141,13 @@ coordinator_loop(Reducer, Mappers) ->
 	    {ok, Result} = rpc(Reducer, {job, {RedFun, RedInit, length(Data)}}),
 
 	    From ! {Ref, {ok, Result}},				  
-
-	    coordinator_loop(Reducer, Mappers);
-	%% Accidentally safe, because exit received here, means the entire thing is idle...
-	{'EXIT', Pid, Reason } ->
-	    io:format("~p exited because of ~p~n", [Pid, Reason]),
-
-	    if Pid =:= Reducer -> 
-	    	    %% Reducer died
-		    NewRed = spawn_link(fun reducer_loop/0),
-		    %% Inform mappers of new reducer.
-		    lists:foreach(fun(M) -> reducer_async(M, NewRed) end, Mappers),
-		    coordinator_loop(NewRed, Mappers);
-	       ?otherwise ->
-	    	    %% Mapper died
-		    NewMapper = spawn_link(fun() -> mapper_loop(Reducer, id()) end),
-		    NewMappers = [NewMapper|lists:delete(Pid, Mappers)],
-		    coordinator_loop(Reducer, NewMappers)
-	    end
+	    
+	    info(Supervisor, idle),
+	    coordinator_loop(Supervisor, Reducer, Mappers);
+	{new_reducer, NewR} ->
+	    coordinator_loop(Supervisor,NewR, Mappers);
+	{new_mappers, NewMs} ->
+	    coordinator_loop(Supervisor,Reducer, NewMs)
     end.
 
 send_data(Mappers, Data) ->
