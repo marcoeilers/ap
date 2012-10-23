@@ -12,7 +12,7 @@
 
 start(N) ->
     {Reducer, Mappers} = init(N),
-    {ok, spawn(fun() -> process_flag(trap_exit, true),
+    {ok, spawn(fun() -> %%process_flag(trap_exit, true),
 			
 			coordinator_loop(Reducer, Mappers) end)}.
 
@@ -48,9 +48,10 @@ id() ->
 %% synchronous communication
 
 rpc(Pid, Request) ->
-    Pid ! {self(), Request},
+    Ref = make_ref(),
+    Pid ! {self(), Ref, Request},
     receive
-	{Pid, Response} ->
+	{Ref, Response} ->
 	    Response
     end.
 
@@ -86,16 +87,16 @@ coordinator(Reducer, Mappers) ->
 
 coordinator_loop(Reducer, Mappers) ->
     receive
-	{From, stop} ->
+	{From, Ref, stop} ->
 	    io:format("~p stopping~n", [self()]),
 	    lists:foreach(fun stop_async/1, Mappers),
 	    stop_async(Reducer),
-	    reply_ok(From);
-	{From, status} ->
+	    From ! {Ref, ok};
+	{From, Ref, status} ->
 	    io:format("This is MR coordinator ~p managing ~B mappers.~n", [self(), length(Mappers)]),
-	    reply_ok(From),
+	    From ! {Ref, ok},
 	    coordinator_loop(Reducer, Mappers);
-	{From, {job, MapFun, RedFun, RedInit, Data}} ->
+	{From, Ref, {job, MapFun, RedFun, RedInit, Data}} ->
 	    %% Uh, update mappers and reducers, split data and start processing
 	    lists:foreach(fun(M) -> setup_async(M, MapFun) end, Mappers),
 
@@ -103,8 +104,8 @@ coordinator_loop(Reducer, Mappers) ->
 
 	    %% Wait for the reducer to return something
 	    {ok, Result} = rpc(Reducer, {job, {RedFun, RedInit, length(Data)}}),
-	    
-	    reply_ok(From, Result),
+
+	    From ! {Ref, {ok, Result}},				  
 
 	    coordinator_loop(Reducer, Mappers)
     end.
@@ -128,9 +129,9 @@ reducer_loop() ->
 	stop -> 
 	    io:format("Reducer ~p stopping~n", [self()]),
 	    ok;
-	{From, {job, {Fun, Acc, Missing}}} ->
+	{From, Ref, {job, {Fun, Acc, Missing}}} ->
 	    io:format("Reducer received new job~n"),
-	    reply_ok(From, gather_data_from_mappers(Fun, Acc, Missing)),
+	    From ! {Ref, {ok, gather_data_from_mappers(Fun, Acc, Missing)}},
 	    reducer_loop()
     end.
 
