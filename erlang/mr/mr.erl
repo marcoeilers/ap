@@ -12,7 +12,9 @@
 
 start(N) ->
     {Reducer, Mappers} = init(N),
-    {ok, spawn(fun() -> coordinator_loop(Reducer, Mappers) end)}.
+    {ok, spawn(fun() -> process_flag(trap_exit, true),
+			
+			coordinator_loop(Reducer, Mappers) end)}.
 
 status(CPid) ->
     rpc(CPid, status).
@@ -78,6 +80,9 @@ setup_async(Pid, Fun) ->
 
 
 %%% Coordinator
+coordinator(Reducer, Mappers) ->
+    process_flag(trap_exit, true),
+    coordinator_loop(Reducer, Mappers).
 
 coordinator_loop(Reducer, Mappers) ->
     receive
