@@ -11,7 +11,20 @@
 %%%% Interface
 
 start(N, Name) ->
-    setup(N, Name).
+    This = self(),
+    spawn(fun() -> process_flag(trap_exit,true),
+		   Red = spawn_link(fun reducer_loop/0),
+		   Mps = [spawn_link(fun() -> mapper_loop(Red, id()) end) || _ <- lists:seq(1,N) ],
+		   Super = self(),
+		   Crd = spawn_link(fun() -> coordinator_loop(Super, Red, Mps) end),
+		   This ! {ready, Crd},
+		   supervise(Red, Mps, Crd, Name, idle)
+	  end),
+    receive
+	{ready, Crd} ->
+	    register(Name, Crd)
+    end,
+    ok.
 
 status(Name) ->
     rpc(whereis(Name), status).
@@ -72,16 +85,6 @@ reducer_async(Pid, Red) ->
     info(Pid, {reducer, Red}).
 
 %%% Coordinator
-setup(N, Name) -> spawn(fun() -> process_flag(trap_exit,true),
-				 Red = spawn_link(fun reducer_loop/0),
-				 Mps = [spawn_link(fun() -> mapper_loop(Red, id()) end) || _ <- lists:seq(1,N) ],
-				 This = self(),
-				 Crd = spawn_link(fun() -> coordinator_loop(This, Red, Mps) end),
-				 register(Name, Crd),
-				 supervise(Red, Mps, Crd, Name, idle)
-			end),
-		  ok.
-
 supervise(Reducer, Mappers, Cord, CordName, Idle) ->
     receive
 	{'EXIT', _, normal } ->
@@ -115,7 +118,7 @@ supervise(Reducer, Mappers, Cord, CordName, Idle) ->
 	idle ->
 	    supervise(Reducer, Mappers, Cord, CordName, idle);
 	stop ->
-	    hammer_time
+	    ok
     end.
 
 coordinator_loop(Supervisor, Reducer, Mappers) ->
