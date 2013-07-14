@@ -1,4 +1,4 @@
 ap
 ==
 
-Advanced Programming at DIKU
+Advanced Programming 2012 @ DIKU
