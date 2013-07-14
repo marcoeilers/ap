@@ -1,0 +1,24 @@
+let #hunted(name, animal) from message =
+  send (name concat #Says) to #println
+  send (name, animal) to #hunted2
+end
+
+let #hunted2() from message =
+  case message of
+       (name, animal) : if animal == #duck 
+                            then send(#wabbit, #season) to #println
+                                 send(#yourTurn) to #bugs
+                            else send(#duck, #season) to #println
+                                 send(#yourTurn) to #duffy
+                        end
+       _              : send (#isnt concat #That concat #Just concat #Beautiful) to #errorlog 
+  end
+end
+
+create #bugs with #hunted(#Bugs, #rabbit)
+create #duffy with #hunted(#Duffy, #duck)
+create #hunted2 with #hunted2()
+send (#yourTurn) to #duffy
+
+
+

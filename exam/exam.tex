@@ -1,0 +1,260 @@
+\documentclass[a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx,times}
+\usepackage{url,paralist,xspace,textcomp, fullpage}
+
+\newcommand{\west}{\ensuremath{\textbf{West}}\xspace}
+\newcommand{\east}{\ensuremath{\textbf{East}}\xspace}
+\newcommand{\south}{\ensuremath{\textbf{South}}\xspace}
+\newcommand{\north}{\ensuremath{\textbf{North}}\xspace}
+\newcommand{\length}{\ensuremath{\textbf{length}}\xspace}
+\newcommand{\el}{\ensuremath{\textbf{`elem`}}\xspace}
+\newcommand{\suc}{\textbf{\ttfamily succ}\xspace}
+\newcommand{\prd}{\textbf{\ttfamily pred}\xspace}
+
+\newcommand{\src}[1]{\texttt{#1}\xspace}
+\newcommand{\func}[1]{\textbf{\ttfamily #1}\xspace}
+\newcommand{\functype}[2]{\mbox{\texttt{\scriptsize\textbf{#1} ::\ #2}}\xspace}
+
+\title{Advanced Programming\\
+Exam}
+\author{Marco Eilers\\ \url{dbk726@alumni.ku.dk} }
+
+
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\scriptsize}
+
+
+\begin{document}
+\maketitle
+
+\section*{About this report}
+For each question, this report contains a paragraph of general remarks concerning the question (e.g. use of certain libraries, assumptions about the question, description of the source files). Then there is a part explaining details of my implementation, which will explain the behaviour of important functions or data structures in detail. For each specific subquestion (e.g. implement function A) there will usually be one or several paragraphs dealing with the function or data structure outlined in the subquestion; however, I will also cover functions and data types \emph{not} directly mentioned in the exam text if they seem important to me. It is very likely that material in one of those paragraphs will also concern some of the specific subquestions, so I would kindly ask every evaluator to always read the entire section.
+
+All source code written by me can be found in the appendix.
+
+\section*{Question 1: IVars in Erlang}
+
+\subsection*{General remarks}
+The source code concerning the first question can be found in the folder \texttt{src/pm} and in Appendix 1. As lined out in the exam text, it consists of the module \texttt{pm} (containing the implementation of the IVars), \texttt{pmuse} (containing the implementations for \texttt{pmmap/2} and \texttt{treeforall/2}) and \texttt{pm\_test}, which contains unit tests for both of the other modules. 
+
+In order to run the tests, EUnit is required. The code has been tested wird Erlang R15B02 (64 bit).
+
+\subsection*{Implementation}
+
+Both kinds of IVars are implemented as one Erlang thread running in the background, which waits for and responds to incoming messages. All functions working on IVars do so by sending messages to the IVar-process (and, if the function is supposed to synchronously return a value, waiting for the response). 
+
+Both IVar implementations consist of two main loops: one that runs when the IVar is empty, and one that runs when it contains a value. Initially, i.e. after creation of the IVar, the empty version of the loop is started. Once this loop receives (and accepts) an input value, it starts the other loop, which will then continue to run indefinitely.
+
+I will now explain the details about the implemented functions:
+
+\begin{itemize}
+  \item \texttt{newVanilla/0} creates a new vanilla IVar, i.e. it spawns a new process which runs the empty vanilla loop. It returns \texttt{\{ok, Pid\}}, where \texttt{Pid} is the process ID of the newly spawned process (which will be used as a reference to the IVar throughout). Since this functions should always run without errors, there is no other possible return value.
+  \item \texttt{newPrincess/1} accepts a predicate $P$, spawns a new process running the empty princess loop with the given predicate. It also returns \texttt{\{ok, Pid\}}.
+  \item \texttt{put/2} takes an IVar (i.e. a process ID) and a value $T$ and sends a message containing the atom \texttt{put} and the value to the specified process. It immediately returns the atom \texttt{ok}, because putting values into IVars is an asynchronous operation.
+  \item \texttt{get/1} takes an IVar, sends the atom \texttt{get} to it, blocks until it gets a response with the IVar's value and then returns said value.
+  \item \texttt{compromised/1} takes an IVar, sends the atom \texttt{compromised} to it, waits for the response (which contains a boolean value) and returns the boolean.  
+  \item \texttt{vanilla\_loop\_empty/0} is the empty loop for vanilla IVars. It waits for two kinds of messages: Those starting with \texttt{put} and those starting with \texttt{compromised}. The former come with a value that is to be put inside the IVar. An empty vanilla loop will simply accept any given value and start \texttt{vanilla\_loop/2} with the received value. Since putting values into IVars is asynchronous, put-messages are not responded to. Messages starting with \texttt{compromised} are simply answered with \texttt{false}, since an empty IVar is never compromised.
+  
+  Note that the empty loop does \emph{not} accept messages starting with \texttt{get}. Those messages will therefore stay in the message queue as long as this loop runs.
+  \item \texttt{princess\_loop\_empty/1} does pretty much the same, except that it checks incoming put-values with the given predicate to decide if it accepts them. The predicate is applied to the value inside a try-block which catches all kinds of errors, so that any error during the evaluation of the predicate will simply give the result \texttt{false}. The result of the evaluation is then checked: if it is \texttt{true}, the value is accepted and \texttt{princess\_loop/1} is started. If the result is any other value (e.g. an integer) the value is rejected, meaning that the empty-loop will continue.
+  \item \texttt{vanilla\_loop/2} represents a vanilla IVar which contains a value. It carries a boolean value specifying if the IVar is \texttt{compromised} (the initial value for this is, of course, false) which is returned if a compromised-message is received. If a \texttt{put}-message is received, this boolean is set to \texttt{true} (whereas the IVar's value is not changed). This loops also accepts get-messages, and replies to them by sending the IVar's value back to the sender.
+  \item \texttt{vanilla\_loop/1} does exactly the same, except that it does not pass around the boolean value to specify if the IVar is compromised. Since princess-IVars are never compromised, a \texttt{compromised}-message will always be answered with \texttt{false}.
+\end{itemize}
+
+Note that this implies several things: While put will not block the current process at all, since it does not wait for a response, \texttt{compromised/1} will block it, but usually only for a very short amount of time, since all IVars always accept compromised-messages and respond to them immediately. \texttt{get/1}, however, will also block the current process, but may do so for a long time or in fact forever: Since empty loops do not accept get-messages (and therefore do not respond to them), they will only be handled once an IVar starts the second loop, i.e. once it has received (and accepted) a value (which may never happen).
+
+Now I'll briefly explain the two functions making use of the IVars:
+
+\begin{itemize}
+  \item \texttt{pmmap/2} takes a function $F$  and a list. For every element $E$ of that list, it creates a new vanilla IVar $IVar_E$, spawns a new process with a function that first runs $F$ on $E$ and then puts the result in $IVar_E$, and returns the IVar. This immediately returns a list of IVars, while in the background the spawned processes evaluate $F(E)$ for every element, possibly in parallel if the system allows it. \texttt{pmmap} then applies \texttt{get} to each of the IVars in the list. This will block the current process until $F(E)$ is evaluated for all $E$ and all results are put into the corresponding IVars. Then it will return a list of results. 
+  
+  Since the actual order of evaluation is left to the scheduler, side-effects of $F$ can occur in any order. If $F$ has side-effects and accesses any data apart from its arguments, the result is therefore non-deterministic. If this is not the case, however, the result is deterministic: Since every result is bound to a specific place in the resulting list through its IVAr, the order of the results is preserved, and therefore \texttt{pmmap} will return the same result as \texttt{lists:map}.
+  
+  Note that none of the IVars will be compromised. There is only one put call pointing at each IVar, therefore \texttt{put} will be called exactly once on each one of them once the computation for the current element is done.
+  \item \texttt{treeforall/2} takes a tree of the form specified in the exam and a predicate $P$. It creates a princess-IVar with the following predicate: The predicate takes a pair of values $\{Res, T\}$, and then returns thhe result of $Res \texttt{ or not}(P(T))$. This means that it returns \texttt{true} if either the first value in the pair is \texttt{true}, or if $\texttt{not}(P(T))$ evaluates to true, which means that $E$ does not satisfy the predicate $P$.
+  
+  \texttt{treeforall} then spawns a process which iterates through the tree and checks for all nodes if they fulfill the predicate, but with a twist: Before checking a node or its subtrees, it puts $\{\texttt{false}, E\}$ into the IVar, where $E$ is the element in the current node. After traversing the whole tree and getting the result $Res$ (which would be either \texttt{true} or \texttt{false}), it puts $\{Res, \texttt{nothing}\}$ in the IVar.
+  
+  After spawning this process, the main \texttt{treeforall} performs a \texttt{get} on the IVar. Once it gets a result (which is a pair, since we only put pairs into the IVar) it returns the first element of said result.
+  
+  The idea here is that \texttt{treeforall} returns a result as soon as a put on the IVar is successful. This is either the case if an an element does not fulfill $P$ (which makes the second part of the or-expression true) - and since we always put in $\{\texttt{false}, E\}$, this would mean that \texttt{treeforall} returns false - or it can be the case if the result of traversing the whole tree is \texttt{true}, in which case \texttt{treeforall} also returns \texttt{true}. In either case the function returns as soon as the result is known (and some additional message passing is done). If the result is \texttt{false}, the traversing of the tree will continue in the background. 
+  
+  As with the IVars in general, if a predicate fails or returns anything other than \texttt{true}, this is interpreted as \texttt{false}. I implemented this by using my own version of \texttt{not} (called \texttt{robustNot/2}). Since we can assume that predicates will terminate one way or the other, this means that \texttt{treeforall} will always terminate as well.
+  
+  In this case our one IVar is never compromised because it is a princess-IVar, and those are by definition never compromised.
+\end{itemize}
+
+\subsection*{Assessment}
+I think that my implementation fulfills the requirements outlined in the exam text and is fairly reasonably implemented. Both the IVars and the two functions using them seem to do what I expect them to do in all instances. To verify that the behaviour is as expected, I implemented a number of tests using EUnit. All of them are black box tests. 
+
+For details on the tests, see the module \texttt{pm\_test}. Use \texttt{pm\_test:test\_all/0} to run all tests. I will give an overview of the tested functionality here:
+\begin{itemize}
+  \item I test basic functionality like creating IVars, make sure that they are created without errors and return process IDs.
+  \item I make sure \texttt{put} calls return immediately, independent of the IVar or the value they're sending.
+  \item I make sure values can be retrieved from IVars, and that subsequent put calls do not change an IVar's value once it has accepted one...
+  \item ... but change their 'compromised' attribute (if applicable).
+  \item I make sure \texttt{get} blocks until a value is available.
+  \item I make sure princess IVars only accept values satisfying their predicate...
+  \item .. and that erroneous predicates or non-boolean results are caught and treated as a \texttt{false}.
+  \item I test if \texttt{pmmap} returns the same result as \texttt{lists:map/2} for several differnt lists and functions.
+  \item Likewise, I test if \texttt{treeforall} returns correct results for a number of different predicates and trees, including special cases like empty trees (leaves). 
+  \item Like with the princess IVars, I make sure that \texttt{treeforall} interprets errors and non-boolean return values from the predicate as \texttt{false}.
+\end{itemize}
+
+Since the structure of the code is relatively simple and all tests run correctly, I am very confident that my implementation of this part as no major flaws.
+
+I cannot think of any real improvements on the structure of the IVars themselves. It would be possible to spawn an extra process for the evaluation of predicates in princess IVars. Since the IVar process would have to block until it gets some kind of response from that additional process, this would not accomplish any performance gains. It could, however, work as an even better way to shield the IVar process from failing predicates than the try-catch-block I used, but since my solution worked in all cases I tried, I kept it for its relative simplicity. My solution will also spawn less processes. This may not be a big factor, since we expect all predicate-evaluating processes to quit relatively soon, but it might prevent problems in environments where a big number of IVars is needed. Since Erlang only supports a limited number of process that are active at the same time, needing less processes might be desirable.
+
+Some basic extensions to the IVar API come to mind that might be useful in a productive environment. In the current implementation, all IVars exist forever, there is no way to kill them. This means essentially that one has to stop creating IVars at some point, or eventually Erlang's process limit will be reached. Some way to dispose of IVars when they are no longer needed would therefore be nice to have.
+
+The mapping function implemented using the IVars strikes me as a reasonable way to do parallel computation. The current version spawns a new process for every element of the input list, which would be overkill for most applications, and makes it impossible to use \texttt{pmmap} on very large lists (since, again, the process limit will be reached). An improved version could therefore spawn one process for a number of list elements (and fix either the number of elements per process or the overall number of processes).
+
+\texttt{treemap} fulfills the specification and does its job, but I \emph{do} think this functionality could be implemented more effectively in other ways. My implementation is the result of me forcing myself to somehow use IVars for this task, not the result of me trying to do the best possible implementation for checking predicates on trees. Using simple message passing instead of IVars could achieve the same task while being less complicated. The fact that computation may continue in the background \emph{after} a result has been returned (meaning the additional computation is completely irrelevant  to the result) should make clear that there are better ways to do this. However, given the constraint that IVars should be involved in a major way, I think my implementation holds up pretty well.
+
+\section*{Question 2: Parsing Soil}
+
+\subsection*{General remarks}
+I have used \texttt{ReadP} for my parser, mostly because I have used it for a rather extensive exercise and therefore have much more experience with it than with \texttt{SimpleParse}. I do, however, use the aliases provided by \texttt{SimpleReadP}, again because that is what I am used to. As a result, my code might run (maybe with a few modifications) with \texttt{SimpleParse} as well.
+
+All my code that concerns the parser can be found in appendix 2. 
+
+I tested everything with GHC in version 7.4.1.
+
+\subsection*{Implementation}
+Most of the implementation was pretty straightforward and consisted of combining the symbols and sub-parsers as specified in the grammar. There were some special cases which I will discuss here.
+\begin{itemize}
+  \item I have modified \texttt{SimpleReadP} to allow for all kinds of whitespace between tokens instead of only spaces. I also changed \texttt{parseEof} to allow whitespace between the last token and the end of file.
+  \item \texttt{ident} first consumes a hash character, then uses \texttt{munch1} to consume as many alphanumeric characters or underscores as possible. It returns only the result of \texttt{munch}; the hash is not part of the resulting Ident. I had to use \texttt{munch1} here instead of \texttt{munch}; otherwise, a single hash would have been a valid Ident (which would have been represented by an empty string). I assume that this is not what was intended.
+  \item \texttt{name} consumes a letter and then uses \texttt{munch} to consume as many alphanumeric characters or underscores as possible. Here the first character is not discarded, but all consumed characters are returned as the resulting Name. I assume that a single letter is a valid Name, which is why I use \texttt{munch} here instead of \texttt{munch1}. Before returning the result, I check if it is equal to one of Soil's reserved words. If it is, I use \texttt{pfail} to reject the result, since reserved words may not be used as names. Otherwise the result is returned.
+  \item \texttt{prim} is a bit tricky to implement because its rule has left recursion, which means the parser for this rule would not terminate if implemented naively. This is also the case for a few other rules in the original grammar, but in those cases I could just use \texttt{sepBy} to avoid the problem, since they all resulted in an array. An easy way to solve the problem for Prims would be to create a parser for 'SimplePrims' (which I did), that parses the non-recursive Prims, and then parse Prims by first parsing a SimplePrim, then the symbol \texttt{concat}, and then another Prim. This parser would actually terminate and parse the code almost correctly: The resulting AST would be correct if \texttt{concat} was right-associative. Since the exam text explicitly states that \texttt{concat} is left-associative, this solution did not work, and I had to use \texttt{chainl1} together with simplePrim to get the correct AST.
+  \item \texttt{program} is the parser that combines all others, and the one used to parse Soil programs.
+  \item \texttt{parseString} takes a string and tries to parse a Soil program from that string. If it succeeds to consume the entire string, it returns the AST of the parsed program; however, if more than zero characters cannot be consumed, it returns an error of the following form:
+  \item The \texttt{Error} type I return when \texttt{parseString} cannot consume the complete string includes a pair detailing the line and the column of the last successfully consumed character, meaning that there is an error in the source code at some point after the specified character. Note that the actual error may be very far away from said character, so this is really not more than a hint that the code \emph{until} this point is okay.
+  \item \texttt{parseFile} takes a path to a file, reads all characters in said file, and uses \texttt{parseString} on the resulting string. Its return value is the same as that of \texttt{parseString}, but in the IO monad.
+\end{itemize}
+
+\subsection*{Assessment}
+I am very confident that my parser correctly implements the specification and produces correct ASTs. It consumes all given sample programs and all programs and expression written by me without problems and produces exactly the ASTs specified in the assignment text. It can deal with any amount of whitespace (or lack thereof) between tokens as long as the source code remains unambiguous. Subtleties like the left-associavity of \texttt{concat} statements seem to work just as expected. 
+
+I have conducted a number of tests for my parser. Among them are white-box tests for some special cases, as well as black box tests for some bigger and all-encompassing examples. I have used HUnit for all my test cases. They are all contained in the module \texttt{SoilParserTest}. To run all tests, run \texttt{testAll} in said module.
+
+Specifically, my tests cover the following cases:
+\begin{itemize}
+  \item They make sure that names are accepted and rejected according to the rules; e.g. names identical to reserved words, containing special characters or starting with a number are illegal.
+  \item They check the same for idents. In this case they make sure that idents consisting of a hash and a reserved word \emph{are} in fact accepted.
+  \item They make sure the example of a \texttt{case} expression given in the exam text results in the right AST. 
+  \item They make sure that whitespace can be left out if the resulting source code remains unambiguous, that any amount of unnecessary whitespace does not prevent the parser from working correctly.
+  \item They test if some special cases parse correctly, e.g. a \texttt{case} expression with only the fallback case and an empty body.
+  \item They make sure that \texttt{concat} is in fact left-associative.
+  \item They test some expressions that do not occur very often in the provided examples (like \texttt{if}).
+  \item They make sure that correct error messages are returned for invalid code.
+  \item They make sure the ASTs resulting from parsing the three example programs given in the exam are identical to the provided ASTs.
+  \item A small Soil program I wrote (\texttt{looneyTunes.soil}) is parsed correctly as well.
+  \item Finally, some tests for the interpreter also depend on the parser, to that they implicitly test both at the same time.
+\end{itemize} 
+
+There is, of course, a lot of room left for improvement. ReadP does not provide any really useful information on error conditions. In my implementation, I return the line and character of the last correctly parsed piece of code in order to simplify the search for errors (and make it look more in line with normal compilers and interpreters). This does not change the fact, however, that there is no information at all about the specifics of the error that occured. Additionally, the last correctly parsed bit of the source code may very well be far away from the bit that actually contained an error. It was not in the scope of this exam to change this, but if one wanted to use this parser for any purpose in practice, this feature would be indispensible.
+
+I cannot be entirely certain, of course, that my parser really works correctly for all possible inputs. It would be possible to use a different Soil parser and automatically generate test cases in order to verify that my parser always produces the same results; however, I did not find any such parser (the grammar for Humus seems to be too different from that of Soil). 
+
+Even without using another parser, one could automatically generate (valid or invalid) Soil code (e.g. using QuickCheck) and make sure that the parser accepts it when valid, and rejects it otherwise. This would not show that the generated AST is correct, but it could show that the parser can correctly distinguish correct code from incorrect code (provided the code generator works correctly). I did not implement this because I lacked the time, but generating valid code should actually be a relatively straightforward task, as one simply has to implement the grammar once again. Generating useful test cases for invalid code, however, might prove to be more diffucult; for these cases it might be easier to just hand-code some unit tests like I did.
+
+\section*{Question 3: Interpreting Soil}
+
+\subsection*{General remarks}
+I have made a few additional assumptions regarding the behaviour of Soil programs:
+\begin{itemize}
+  \item \texttt{concat} can only be used to concatenate two single Idents, \emph{not} to concatenate a lists of Idents (which may result from evaluating a Name). Trying to do so will result in a runtime error.
+  \item \texttt{become} and \texttt{self} can only be used inside a function. If they are used at the top level, a static error is thrown.
+\end{itemize}
+
+For all other questions and/or ambiguities, I stick to the answers given on the discussion board on Absalon.
+
+Source code for this part can be found in appendix 3, with the exception of Soil source code that was already used for testingthe parser.
+
+\subsection*{Implementation}
+I implemented my interpreter using a central monad which I called \texttt{SoilProgram}. Essentially, it is a version of the state monad, and I use it to keep track of the program state after the execution of each step. Its type is \texttt{ProgramState -> (a, ProgramState)}, meaning that it takes an initial state, runs a program (which can also be a single command) on that state, and returns the program's return value along with the updated state. Since almost any command one can execute depends on, and sometimes changes, the current environment, it is advantageous to be able to always access and change said environment without having to pass it around in every function; the SoilProgram monad handles this for me.
+
+Note that I did not use \texttt{Maybe} or \texttt{Either} or any similar construct in the return type of my monad to handle errors. Instead, static errors simply throw an error (and thus terminate the program), since we are allowed to assume that they do not occur. Runtime errors, on the other hand, are handled by the \texttt{errorlog} process within the language and are therefore already part of the program's state.
+
+However, error handling does take places on lower levels of the program. I generally try to do all error-handling on a high level, since this means that more is known about the context in which the error occured, and thus error messages can be more detailed. In some cases, it is even necessary to know the context in order to decide if a runtime error or a static error should be thrown, or regular behaviour should continue. This means that low-level functions, which operate directly on the program state, will often return \texttt{Maybe} values, and higher level functions then decide how to deal with errors if they get \texttt{Nothing}. However, in some cases where a low-level function is used exclusively by one higher-level function, I do not propagate the error and handle it right away for convenience.
+
+There are some additional \texttt{error} statements in the code which do not represent static errors; I called them internal errors. These can only occur if a (not exported) low-level function is called with invalid arguments. Since my higher level functions check all such conditions before calling those other functions, and usually throw a runtime error to deal with it, the internal errors will never be thrown if my higher level functions are used. 
+
+The alternative would have been to either use \texttt{Maybe}, and therefore introduce a lot of additional case-switching, just to deal with cases that \emph{cannot occur}, to return nonsensical dummy values in all such situations, or to have some non-exhaustive pattern matches. I decided to follow the Haskell Programming Guidelines\footnote{http://www.haskell.org/haskellwiki/Programming\_guidelines}, i.e. cover all cases and throw an error in the unreachable ones if there is no sensible return value.
+
+As for the problem of having Prims that can either evaluate to single Idents or to messages (i.e. lists of Idents), this did mess up my code quite a bit and required a lot of additional error-checking. I have decided to evaluate any Prim to a list if Idents, and generally work with lists of Idents throughout the code. I then check if these lists contain only single values when I need to, and throw a runtime error if they do not.
+
+I will now explain the most important parts of the interpreter in detail:
+
+\begin{itemize}
+  \item \texttt{ProgramState} is a data structure containing the current state of the program. It contains a name environment, a function environment, the curent process queue, information about the current process (if any), as well as the output of the program and an error log for runtime errors. The current process is stored as a \texttt{Maybe}, since there is no current process during the execution of the top level ActOps. 
+  
+  There are a number of helper functions for retrieving and storing each field of the current status.
+  \item \texttt{NameEnv} maps Names to lists of Idents. Since Names are the equivalent of variables in Soil, it basically maps variable names to their values. Since a Name can point to a message (a list of Idents) as well as to a single Ident, and I needed a common data type, single Idents are stored as lists with only one element. 
+  
+  I implemented this using Haskell's \texttt{Data.Map}, which also provides functions for looking up Names in the Map. My function \texttt{lookupName} takes a name, gets the NameEnv from the current state, looks the name up using \texttt{Data.Map.lookup} and returns the result, which may either be Nothing if the name was not mapped to anything, or \texttt{Just} $v$ where $v$ is a list of Idents. \texttt{insertName}, on the other hand, takes a pair of a Name and a list of Idents, and then checks if the name is already bound in the map. If this is the case, it throws a static error, because names may not be bound twice. Otherwise, it inserts the new values into the NameEnv using \texttt{Data.Map.insert}.
+  \item \texttt{funcEnv} is very similar to NameEnv, but maps Idents (function identifiers) to Funcs, and I also used Haskell's map type to implement it. The lookup and insert functions are also analogous: \texttt{lookupFunc} takes an Ident and may return a Func, or \texttt{Nothing} if no function is bound to the specified identifier. \texttt{insertFunc} takes a pair of an Ident and a Func, throws a static error if the Ident is already bound to a Func, and inserts the pair into the FuncEnv.
+  \item \texttt{Process} represents a running process and contains the ID of the process' current function, the functions's arguments (a list of lists of Idents) and a list of incoming messages. Processes are kept in and managed by the ProcessQueue, which I implemented as a simple list of pairs of a process ID and a process. The process queue has two important jobs: It must keep track of the order of the processes (this is especially important for the Round Robin scheduler), as well as looking up a Process by its Pid. A list of pairs is the perfect data structure for the queue: Haskell already has a lookup function for lists of key-value-pairs, adding to that list means just appending a pair and lists are also able to keep track of the order of different processes.
+  
+  I then implemented basic functions for getting processes from the queue, updating existing processes and adding new ones. 
+  
+  Using these functions, I could then write functions that, given a Pid, get the corresponding process from the queue and perform certain operations on it. One of the important ones is \texttt{getOldestMessage} which, given a Pid, returns the oldest message in the corresponding process' mailbox and \emph{removes} it from the mailbox. If the mailbox is empty, it returns Nothing. Most other functions for manipulating processes are relatively straightforward.
+  \item \texttt{processStep} takes a Pid, looks up the Process, gets the oldest message from its mailbox, looks up the process's function and its parameters, binds those to the process's arguments, binds the message to its name and executes the expression in the function body. If it receives an unknown process ID, it throws an internal error. Since processStep is called by the scheduler, and the scheduler only calls processStep on existing Pids, this can never happen. If, on the other hand, the mail box of the specified process is empty, processStep just returns normally without doing anything else.
+  
+  In order to evaluate a function body, processStep uses \texttt{evalExpr}, which executes expressions and will, in turn, call \texttt{evalActOp} to execute zero or more ActOps. Both of these evaluation functions also use \texttt{evalPrim}, which carries out concatenations and gets name bindings from the environment. Basically, all of the actual interpretation of the AST happens between these functions. This is also the reason why any number of static or runtime errors can result from a call to processStep, since the subfunctions it might possibly call are numerous.
+  
+  If processStep is applied to either the \texttt{println} or the \texttt{errorlog} process, its behaviour differs: In these cases, it does not look up any function; instead, it fetches the oldest message and adds it to the ProgramState's output or errorlog lists. This means that the functionality for the predefined processes is implemented directly in processStep.
+  \item \texttt{nextProcessRR} returns the Pid of the first process in the process queue, independent of the state of its mailbox. It then puts said process to the back of the process queue.  
+  \item \texttt{runProgRR} takes an int $n$ and a Soil program, then runs the program for $n$ steps using the round robin scheduler. First it adds all function definitions to the FuncEnv, then it executes all top-level ActOps. If this results in a process queue with more than the two predefined processes in it, it starts a loop which gets the next process ID from the Round Robin scheduler and executes this process for one step (using \texttt{processStep}). This loop is executed $n$ times. This results in a ProgramState (unless a static error is thrown), from which \texttt{runProgRR} retrieves the output and error log and returns them. 
+  
+  Note that, since \texttt{\#println} and \texttt{\#errorlog} are processes, their printing and logging activities count as steps just like the execution of any other process.
+  \item \texttt{nextProcAll} returns the Pids of \emph{all} process which have messages in their mailbox and can therefore be executed. \texttt{nextProcAll} does \emph{not} change the order of processes in the queue: Since all possible processes are executed anyway, the order in the queue does not matter.
+  \item \texttt{runProgAll} uses \texttt{nextProcAll} to try all possible evaluation orders for a given amount of steps. It gets a list of Pids of processes that can run in the current state and executes each of those processes once. It does this in parallel, meaning that it ends up with a list of resulting states as long as the list of runnable processes. Now it starts again by getting a list of runnable processes for \emph{each of those states}, and so on. Again, this loop is repeated $n$ times. The result size grows exponentially with respect to $n$, so for testing purposes, small values are recommended.
+\end{itemize}
+
+\subsection*{Assessment}
+I am quite pleased that I managed to implement all the functionality that was asked for, and I do think it works correctly in most cases. The size of this task makes it impossible to test for all cases, and quite often there was simply no reference solution to compare it to. Additionally, issues like the problem of the unknown form of Prims makes it much harder to make a case (or even prove) that a given function works correctly for all inputs. That being said, it is possible to test parts of the interpreter and check if the results seem correct, which is what I did for most parts. I also had a look at the results of the sample programs given in the exam text and some self-written ones, and they are what I would expect from going through the code manually, at least for the RoundRobin scheduler. 
+
+For the scheduler that tries \emph{all} possible execution orders, it is much harder to say if the results are correct. The ones for the Hello-World program seem correct, but the sheer number of results makes it impossible to check the results for the other two programs. However, everything that I \emph{could} verify in some way turned out to be correct, which is why I think my interpreter works at least for most cases. 
+
+More specifically, i performed the following tests: 
+\begin{itemize}
+  \item I performed white box tests on all basic cases of all tree eval-functions, meaning \text{evalExpr}, \text{evalActOp} and \text{evalPrim}. I create a \texttt{SoilProgram} consisting of only one action (or nearly only that, if using only one is not permitted by the grammar) and apply it to an initial \texttt{ProgramState}. I then make sure that the resulting state is the one I would expect after running said command.
+  \item I run both schedulers in different states to make sure they choose the correct processes to be executed.
+  \item I feed runProgRR with a short program containing different kinds of errors and make sure all errors are thrown.
+  \item I black-box tested runProgRR by applying it to all example Soil programs we got, and made sure (manually) that the result was correct (or at least plausible). I then implemented a test which automatically checks that said result is returned. 
+  \item I run runProgRR on my own program (\texttt{looneyTunes.soil}) make sure the result is what I had in mind.
+  \item For \texttt{runProgAll}, I compare the result it returns for the Hello World program to the result I got when I manually stepped through the program.
+\end{itemize}
+For all the details, have a look at \texttt{SoilInterpTest}. All tests are run by calling \texttt{testAll}.
+
+The two things about my implementation that I am not happy with, even though they seem to work correctly, are the unclean handling of Ident lists and the throwing of errors. In the former case, I would try to use different data types for handling messages and single idents if I were to do it all over again (and maybe had a chance to adapt the grammar at this point). Simply having a clear way to know what I am dealing with in every situation would make everything much easier. For the second part, I am less sure how to avoid these problems in the future. It would definitely be possible to use Either or a similar type as the return value of SoilProgram, and just handle static errors using the Left clause. Yet I would quite probably still have places in my program where I cannot return a sensible value, and using Maybe for all of them, especially when I know a case cannot occur, would unnecessarily clutter my code.
+
+Apart from that, I think I made mostly good choices in my implementation. My central monad really does make many things a lot easier for me, and all the data structures I used do their work nicely. The code is mostly monadic, which was one of the requirements of the exam, but it is not unnecessarily so. Also, I think I found a good compromise between too many very small functions and few very big functions.
+
+\newpage
+\section*{Appendix}
+\subsection*{Appendix 1: Erlang source code}
+\lstinputlisting[caption=pm.erl, language=Erlang]{src/pm/pm.erl}
+\lstinputlisting[caption=pmuse.erl, language=Erlang]{src/pm/pmuse.erl}
+\lstinputlisting[caption=pm\_test.erl, language=Erlang]{src/pm/pm_test.erl}
+
+\subsection*{Appendix 2: Soil parser source code}
+\lstinputlisting[caption=SoilParser.hs, language=Haskell]{src/soil/SoilParser.hs}
+\lstinputlisting[caption=SimpleReadP.hs, language=Haskell]{src/soil/SimpleReadP.hs}
+\lstinputlisting[caption=SoilParserTest.hs, language=Haskell]{src/soil/SoilParserTest.hs}
+\lstinputlisting[caption=Soil Code example]{src/soil/examples/looneyTunes.soil}
+
+\subsection*{Appendix 3: Soil interpreter source code}
+\lstinputlisting[caption=SoilInterp.hs, language=Haskell]{src/soil/SoilInterp.hs}
+\lstinputlisting[caption=SoilInterpTest.hs, language=Haskell]{src/soil/SoilInterpTest.hs}
+\lstinputlisting[caption=Soil code for testing errors]{src/soil/examples/errors.soil}
+
+
+\end{document}

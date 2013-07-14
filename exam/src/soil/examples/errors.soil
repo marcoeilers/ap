@@ -1,0 +1,10 @@
+let #print() from message = 
+  send (message) to #println
+end 
+       
+create #hw1 with #print() 
+create #hw2 with #print()
+create #hw2 with #print()
+create #hw3 with #trace()
+create #hw4 with #print(#test)
+
